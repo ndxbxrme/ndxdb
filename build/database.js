@@ -50,24 +50,20 @@
           return async.eachSeries(r.Contents, function(key, callback) {
             return key.Key.replace(/(.+):(.+):(.+)\/(.+)/, function(all, db, type, table, id) {
               if (db && table && id && db === dbname) {
-                if (table.length === 1) {
-                  return s3.get(key.Key, function(e, o) {
-                    var idField;
-                    if (e) {
-                      return callback();
-                    }
-                    idField = config.autoId ? config.autoId : o._id ? '_id' : o.id ? 'id' : 'i';
-                    if (o[idField]) {
-                      database.exec('DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]);
-                      if (!o['__!deleteMe!']) {
-                        database.exec('INSERT INTO ' + table + ' VALUES ?', [o]);
-                      }
-                    }
+                return s3.get(key.Key, function(e, o) {
+                  var idField;
+                  if (e) {
                     return callback();
-                  });
-                } else {
+                  }
+                  idField = config.autoId ? config.autoId : o._id ? '_id' : o.id ? 'id' : 'i';
+                  if (o[idField]) {
+                    database.exec('DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]);
+                    if (!o['__!deleteMe!']) {
+                      database.exec('INSERT INTO ' + table + ' VALUES ?', [o]);
+                    }
+                  }
                   return callback();
-                }
+                });
               } else {
                 return callback();
               }
@@ -124,7 +120,7 @@
         if (maintenanceMode) {
           return [];
         }
-        if (config.autoId && sql.indexOf('INSERT') !== -1) {
+        if (config.autoId && sql.indexOf(/INSERT/i) !== -1) {
           if (Object.prototype.toString.call(props[0]) === '[object Array]') {
             ref = props[0];
             for (i = 0, len = ref.length; i < len; i++) {
@@ -139,20 +135,20 @@
 
         } else {
           if (sql.indexOf('UPDATE') !== -1) {
-            sql.replace(/UPDATE (.+) SET (.+) WHERE (.+)/, function(all, table, set, where) {
+            sql.replace(/UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i, function(all, table, set, where) {
               var noSetFields, res;
               noSetFields = (set.match(/\?/g) || []).length;
               props.splice(noSetFields);
               res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
               if (res && res.length) {
                 return async.each(res, function(r, callback) {
-                  s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.i || r._id || r.id), r);
+                  s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.id || r._id || r.i), r);
                   return callback();
                 });
               }
             });
           } else if (sql.indexOf('DELETE') !== -1) {
-            sql.replace(/DELETE FROM (.+) WHERE (.+)/, function(all, table, where) {
+            sql.replace(/DELETE\s+FROM\s+(.+)\s+WHERE\s+(.+)/i, function(all, table, where) {
               var res;
               res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
               if (res && res.length) {
@@ -168,18 +164,18 @@
               }
             });
           } else if (sql.indexOf('INSERT') !== -1) {
-            sql.replace(/INSERT INTO (.+) (SELECT|VALUES)/, function(all, table) {
+            sql.replace(/INSERT\s+INTO\s+(.+)\s+(SELECT|VALUES)/i, function(all, table) {
               var j, len1, ref1, results;
               if (Object.prototype.toString.call(props[0]) === '[object Array]') {
                 ref1 = props[0];
                 results = [];
                 for (j = 0, len1 = ref1.length; j < len1; j++) {
                   prop = ref1[j];
-                  results.push(s3.put(dbname + ':node:' + table + '/' + (prop[config.autoId] || prop.i || prop._id || prop.id), prop));
+                  results.push(s3.put(dbname + ':node:' + table + '/' + (prop[config.autoId] || prop.id || prop._id || prop.i), prop));
                 }
                 return results;
               } else {
-                return s3.put(dbname + ':node:' + table + '/' + (props[0][config.autoId] || props[0].i || props[0]._id || props[0].id), prop);
+                return s3.put(dbname + ':node:' + table + '/' + (props[0][config.autoId] || props[0].id || props[0]._id || props[0].i), props[0]);
               }
             });
           }

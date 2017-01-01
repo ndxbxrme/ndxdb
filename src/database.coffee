@@ -32,17 +32,14 @@ module.exports = (config) ->
         async.eachSeries r.Contents, (key, callback) ->
           key.Key.replace /(.+):(.+):(.+)\/(.+)/, (all, db, type, table, id) ->
             if db and table and id and db is dbname
-              if table.length is 1
-                s3.get key.Key, (e, o) ->
-                  if e
-                    return callback()
-                  idField = if config.autoId then config.autoId else if o._id then '_id' else if o.id then 'id' else 'i'
-                  if o[idField]
-                    database.exec 'DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]
-                    if not o['__!deleteMe!']
-                      database.exec 'INSERT INTO ' + table + ' VALUES ?', [o]
+              s3.get key.Key, (e, o) ->
+                if e
                   return callback()
-              else
+                idField = if config.autoId then config.autoId else if o._id then '_id' else if o.id then 'id' else 'i'
+                if o[idField]
+                  database.exec 'DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]
+                  if not o['__!deleteMe!']
+                    database.exec 'INSERT INTO ' + table + ' VALUES ?', [o]
                 return callback()
             else
               callback()
@@ -111,7 +108,7 @@ module.exports = (config) ->
             for prop in props[0]
               s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.id or prop._id or prop.i), prop
           else
-            s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].id or props[0]._id or props[0].i), prop
+            s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].id or props[0]._id or props[0].i), props[0]
     database.exec sql, props
   maintenanceOn: ->
     maintenanceMode = true
