@@ -120,7 +120,7 @@
     attachDatabase();
     return {
       exec: function(sql, props, notCritical) {
-        var data, i, len, prop, ref;
+        var i, len, prop, ref;
         if (maintenanceMode) {
           return [];
         }
@@ -135,56 +135,56 @@
             props[0][config.autoId] = ObjectID.generate();
           }
         }
-        data = database.exec(sql, props);
         if (notCritical || !config.awsBucket || !config.awsId || !config.awsKey) {
-          return data;
-        }
-        if (sql.indexOf('UPDATE') !== -1) {
-          sql.replace(/UPDATE (.+) SET (.+) WHERE (.+)/, function(all, table, set, where) {
-            var noSetFields, res;
-            noSetFields = (set.match(/\?/g) || []).length;
-            props.splice(noSetFields);
-            res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
-            if (res && res.length) {
-              return async.each(res, function(r, callback) {
-                s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.i || r._id || r.id), r);
-                return callback();
-              });
-            }
-          });
-        } else if (sql.indexOf('DELETE') !== -1) {
-          sql.replace(/DELETE FROM (.+) WHERE (.+)/, function(all, table, where) {
-            var res;
-            res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
-            if (res && res.length) {
-              return async.each(res, function(r, callback) {
-                var delObj;
-                delObj = {
-                  '__!deleteMe!': true
-                };
-                delObj[config.autoId || '_id'] = r[config.autoId] || r.id || r._id || r.i;
-                s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.id || r._id || r.i), delObj);
-                return callback();
-              });
-            }
-          });
-        } else if (sql.indexOf('INSERT') !== -1) {
-          sql.replace(/INSERT INTO (.+) (SELECT|VALUES)/, function(all, table) {
-            var j, len1, ref1, results;
-            if (Object.prototype.toString.call(props[0]) === '[object Array]') {
-              ref1 = props[0];
-              results = [];
-              for (j = 0, len1 = ref1.length; j < len1; j++) {
-                prop = ref1[j];
-                results.push(s3.put(dbname + ':node:' + table + '/' + (prop[config.autoId] || prop.i || prop._id || prop.id), prop));
+
+        } else {
+          if (sql.indexOf('UPDATE') !== -1) {
+            sql.replace(/UPDATE (.+) SET (.+) WHERE (.+)/, function(all, table, set, where) {
+              var noSetFields, res;
+              noSetFields = (set.match(/\?/g) || []).length;
+              props.splice(noSetFields);
+              res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
+              if (res && res.length) {
+                return async.each(res, function(r, callback) {
+                  s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.i || r._id || r.id), r);
+                  return callback();
+                });
               }
-              return results;
-            } else {
-              return s3.put(dbname + ':node:' + table + '/' + (props[0][config.autoId] || props[0].i || props[0]._id || props[0].id), prop);
-            }
-          });
+            });
+          } else if (sql.indexOf('DELETE') !== -1) {
+            sql.replace(/DELETE FROM (.+) WHERE (.+)/, function(all, table, where) {
+              var res;
+              res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
+              if (res && res.length) {
+                return async.each(res, function(r, callback) {
+                  var delObj;
+                  delObj = {
+                    '__!deleteMe!': true
+                  };
+                  delObj[config.autoId || '_id'] = r[config.autoId] || r.id || r._id || r.i;
+                  s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.id || r._id || r.i), delObj);
+                  return callback();
+                });
+              }
+            });
+          } else if (sql.indexOf('INSERT') !== -1) {
+            sql.replace(/INSERT INTO (.+) (SELECT|VALUES)/, function(all, table) {
+              var j, len1, ref1, results;
+              if (Object.prototype.toString.call(props[0]) === '[object Array]') {
+                ref1 = props[0];
+                results = [];
+                for (j = 0, len1 = ref1.length; j < len1; j++) {
+                  prop = ref1[j];
+                  results.push(s3.put(dbname + ':node:' + table + '/' + (prop[config.autoId] || prop.i || prop._id || prop.id), prop));
+                }
+                return results;
+              } else {
+                return s3.put(dbname + ':node:' + table + '/' + (props[0][config.autoId] || props[0].i || props[0]._id || props[0].id), prop);
+              }
+            });
+          }
         }
-        return data;
+        return database.exec(sql, props);
       },
       maintenanceOn: function() {
         return maintenanceMode = true;
