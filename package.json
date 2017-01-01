@@ -1,6 +1,6 @@
 {
   "name": "ndxdb",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "a cheap and easy in-memory sql database that persits to S3",
   "main": "build/database.js",
   "scripts": {
