@@ -8,10 +8,10 @@
 
   ObjectID = require('bson-objectid');
 
-  module.exports = function(args) {
+  module.exports = function(config) {
     var attachDatabase, database, dbname, maintenanceMode, s3;
-    dbname = args.database || args.dbname || args.databaseName;
-    s3 = require('./s3')(args);
+    dbname = config.database || config.dbname || config.databaseName;
+    s3 = require('./s3')(config);
     database = null;
     maintenanceMode = false;
     attachDatabase = function() {
@@ -19,7 +19,7 @@
       maintenanceMode = true;
       alasql('CREATE DATABASE ' + dbname);
       alasql('USE ' + dbname);
-      ref = args.tables;
+      ref = config.tables;
       for (i = 0, len = ref.length; i < len; i++) {
         table = ref[i];
         alasql('CREATE TABLE ' + table);

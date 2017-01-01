@@ -2,12 +2,12 @@
 
 AWS = require 'aws-sdk'
 
-module.exports = (args) ->
-  dbname = args.database or args.dbname or args.databaseName
-  AWS.config.bucket = args.awsBucket
-  AWS.config.region = args.awsRegion
-  AWS.config.accessKeyId = args.awsId
-  AWS.config.secretAccessKey = args.awsKey
+module.exports = (config) ->
+  dbname = config.database or config.dbname or config.databaseName
+  AWS.config.bucket = config.awsBucket
+  AWS.config.region = config.awsRegion
+  AWS.config.accessKeyId = config.awsId
+  AWS.config.secretAccessKey = config.awsKey
   S3 = new AWS.S3()
   dbs: (cb) ->
     S3.listBuckets {}, (e, r) ->

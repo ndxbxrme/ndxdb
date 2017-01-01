@@ -4,13 +4,13 @@
 
   AWS = require('aws-sdk');
 
-  module.exports = function(args) {
+  module.exports = function(config) {
     var S3, dbname;
-    dbname = args.database || args.dbname || args.databaseName;
-    AWS.config.bucket = args.awsBucket;
-    AWS.config.region = args.awsRegion;
-    AWS.config.accessKeyId = args.awsId;
-    AWS.config.secretAccessKey = args.awsKey;
+    dbname = config.database || config.dbname || config.databaseName;
+    AWS.config.bucket = config.awsBucket;
+    AWS.config.region = config.awsRegion;
+    AWS.config.accessKeyId = config.awsId;
+    AWS.config.secretAccessKey = config.awsKey;
     S3 = new AWS.S3();
     return {
       dbs: function(cb) {

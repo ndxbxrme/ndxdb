@@ -4,16 +4,16 @@ alasql = require 'alasql'
 async = require 'async'
 ObjectID = require 'bson-objectid'
 
-module.exports = (args) ->
-  dbname = args.database or args.dbname or args.databaseName
-  s3 = require('./s3')(args)
+module.exports = (config) ->
+  dbname = config.database or config.dbname or config.databaseName
+  s3 = require('./s3')(config)
   database = null
   maintenanceMode = false
   attachDatabase = ->
     maintenanceMode = true
     alasql 'CREATE DATABASE ' + dbname
     alasql 'USE ' + dbname
-    for table in args.tables
+    for table in config.tables
       alasql 'CREATE TABLE ' + table
     database = alasql.databases[dbname]
     deleteKeys = (cb) ->
