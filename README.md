@@ -38,7 +38,7 @@ var vals = [
     population: 321418000
   }
 ];
-db.exec('INSERT INTO table1 SELECT * FROM ?', vals);
+db.exec('INSERT INTO table1 SELECT * FROM ?', [vals]);
 var result = db.exec('SELECT * FROM table1 WHERE population > ? ORDER BY population ASC', [500000000]);
 /*
 result = [
