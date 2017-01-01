@@ -33,6 +33,6 @@
     "alasql": "^0.3.5",
     "async": "^2.1.4",
     "aws-sdk": "^2.7.20",
-    "bcrypt-nodejs": "0.0.3"
+    "bson-objectid": "^1.1.4"
   }
 }
