@@ -5,8 +5,7 @@
 
 # In development, think twice before using this!
 * ndxdb is currently intended for small (single server) projects and will not scale, though I reckon someone who is good with websockets could help me fix that (hint hint). 
-* it is very picky about sql parsing for INSERTS, UPDATES and DELETES
-make sure for those that you capitalize your sql properly, don't go mad with spaces and only execute one command at a time (no chaining with ;) 
+* you should only execute one INSERT, UPDATE OR DELETE command at a time (no chaining with ;) 
 * every row in the database must have an id field (named id, _id or i).  id's can be generated automatically by using the `autoId` setting
 ```
   // examples of good inserts etc

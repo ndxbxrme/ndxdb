@@ -77,7 +77,7 @@ module.exports = (config) ->
   exec: (sql, props, notCritical) ->
     if maintenanceMode
       return []
-    if config.autoId and sql.indexOf('INSERT') isnt -1
+    if config.autoId and sql.indexOf(/INSERT/i) isnt -1
       if Object.prototype.toString.call(props[0]) is '[object Array]'
         for prop in props[0]
           prop[config.autoId] = ObjectID.generate()
@@ -87,16 +87,16 @@ module.exports = (config) ->
       #do nothing
     else
       if sql.indexOf('UPDATE') isnt -1
-        sql.replace /UPDATE (.+) SET (.+) WHERE (.+)/, (all, table, set, where) ->
+        sql.replace /UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i, (all, table, set, where) ->
           noSetFields = (set.match(/\?/g) or []).length
           props.splice noSetFields
           res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
           if res and res.length
             async.each res, (r, callback) ->
-              s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.i or r._id or r.id), r
+              s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), r
               callback()
       else if sql.indexOf('DELETE') isnt -1
-        sql.replace /DELETE FROM (.+) WHERE (.+)/, (all, table, where) ->
+        sql.replace /DELETE\s+FROM\s+(.+)\s+WHERE\s+(.+)/i, (all, table, where) ->
           res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
           if res and res.length
             async.each res, (r, callback) ->
@@ -106,12 +106,12 @@ module.exports = (config) ->
               s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), delObj
               callback()
       else if sql.indexOf('INSERT') isnt -1
-        sql.replace /INSERT INTO (.+) (SELECT|VALUES)/, (all, table) ->
+        sql.replace /INSERT\s+INTO\s+(.+)\s+(SELECT|VALUES)/i, (all, table) ->
           if Object.prototype.toString.call(props[0]) is '[object Array]'
             for prop in props[0]
-              s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.i or prop._id or prop.id), prop
+              s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.id or prop._id or prop.i), prop
           else
-            s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].i or props[0]._id or props[0].id), prop
+            s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].id or props[0]._id or props[0].i), prop
     database.exec sql, props
   maintenanceOn: ->
     maintenanceMode = true
