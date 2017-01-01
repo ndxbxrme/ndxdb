@@ -1,6 +1,6 @@
 # ndxdb
 * a cheap and easy in-memory sql database for nodejs projects that persits to S3 
-* built on top of the mighty (alasql)[https://github.com/agershun/alasql] 
+* built on top of the mighty [alasql](https://github.com/agershun/alasql)
 * useful for hobby projects on free servers (heroku) where you don't want the hassle of a database server and don't have reliable on-server file storage 
 # In development, think twice before using this!
 * ndxdb is currently intended for small (single server) projects and will not scale, though I reckon someone who is good with websockets could help me fix that (hint hint). 
