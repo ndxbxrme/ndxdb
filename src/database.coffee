@@ -83,37 +83,36 @@ module.exports = (args) ->
           prop[config.autoId] = ObjectID.generate()
       else
         props[0][config.autoId] = ObjectID.generate()
-      
-    data = database.exec sql, props
     if notCritical or not config.awsBucket or not config.awsId or not config.awsKey
-      return data
-    if sql.indexOf('UPDATE') isnt -1
-      sql.replace /UPDATE (.+) SET (.+) WHERE (.+)/, (all, table, set, where) ->
-        noSetFields = (set.match(/\?/g) or []).length
-        props.splice noSetFields
-        res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
-        if res and res.length
-          async.each res, (r, callback) ->
-            s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.i or r._id or r.id), r
-            callback()
-    else if sql.indexOf('DELETE') isnt -1
-      sql.replace /DELETE FROM (.+) WHERE (.+)/, (all, table, where) ->
-        res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
-        if res and res.length
-          async.each res, (r, callback) ->
-            delObj =
-              '__!deleteMe!': true
-            delObj[config.autoId or '_id'] = r[config.autoId] or r.id or r._id or r.i
-            s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), delObj
-            callback()
-    else if sql.indexOf('INSERT') isnt -1
-      sql.replace /INSERT INTO (.+) (SELECT|VALUES)/, (all, table) ->
-        if Object.prototype.toString.call(props[0]) is '[object Array]'
-          for prop in props[0]
-            s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.i or prop._id or prop.id), prop
-        else
-          s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].i or props[0]._id or props[0].id), prop
-    return data
+      #do nothing
+    else
+      if sql.indexOf('UPDATE') isnt -1
+        sql.replace /UPDATE (.+) SET (.+) WHERE (.+)/, (all, table, set, where) ->
+          noSetFields = (set.match(/\?/g) or []).length
+          props.splice noSetFields
+          res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
+          if res and res.length
+            async.each res, (r, callback) ->
+              s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.i or r._id or r.id), r
+              callback()
+      else if sql.indexOf('DELETE') isnt -1
+        sql.replace /DELETE FROM (.+) WHERE (.+)/, (all, table, where) ->
+          res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
+          if res and res.length
+            async.each res, (r, callback) ->
+              delObj =
+                '__!deleteMe!': true
+              delObj[config.autoId or '_id'] = r[config.autoId] or r.id or r._id or r.i
+              s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), delObj
+              callback()
+      else if sql.indexOf('INSERT') isnt -1
+        sql.replace /INSERT INTO (.+) (SELECT|VALUES)/, (all, table) ->
+          if Object.prototype.toString.call(props[0]) is '[object Array]'
+            for prop in props[0]
+              s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.i or prop._id or prop.id), prop
+          else
+            s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].i or props[0]._id or props[0].id), prop
+    database.exec sql, props
   maintenanceOn: ->
     maintenanceMode = true
   maintenanceOff: ->
