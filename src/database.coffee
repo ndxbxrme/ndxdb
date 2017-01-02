@@ -74,7 +74,7 @@ module.exports = (config) ->
   exec: (sql, props, notCritical) ->
     if maintenanceMode
       return []
-    if config.autoId and sql.indexOf(/INSERT/i) isnt -1
+    if config.autoId and /INSERT/i.test(sql)
       if Object.prototype.toString.call(props[0]) is '[object Array]'
         for prop in props[0]
           prop[config.autoId] = ObjectID.generate()

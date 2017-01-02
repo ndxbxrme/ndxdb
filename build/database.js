@@ -120,7 +120,7 @@
         if (maintenanceMode) {
           return [];
         }
-        if (config.autoId && sql.indexOf(/INSERT/i) !== -1) {
+        if (config.autoId && /INSERT/i.test(sql)) {
           if (Object.prototype.toString.call(props[0]) === '[object Array]') {
             ref = props[0];
             for (i = 0, len = ref.length; i < len; i++) {
