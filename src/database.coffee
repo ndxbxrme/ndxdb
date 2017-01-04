@@ -83,7 +83,7 @@ module.exports = (config) ->
     if notCritical or not config.awsBucket or not config.awsId or not config.awsKey
       #do nothing
     else
-      if sql.indexOf('UPDATE') isnt -1
+      if /UPDATE/i.test(sql)
         sql.replace /UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i, (all, table, set, where) ->
           noSetFields = (set.match(/\?/g) or []).length
           props.splice noSetFields
@@ -92,9 +92,15 @@ module.exports = (config) ->
             async.each res, (r, callback) ->
               s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), r
               callback()
-      else if sql.indexOf('DELETE') isnt -1
-        sql.replace /DELETE\s+FROM\s+(.+)\s+WHERE\s+(.+)/i, (all, table, where) ->
-          res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
+      else if /DELETE/i.test(sql)
+        delReg = /DELETE\s+FROM\s+([^\s]+)/i
+        if /WHERE/i.test(sql)
+          delReg = /DELETE\s+FROM\s+(.+)\s+WHERE\s+(.+)/i
+        sql.replace delReg, (all, table, where) ->
+          if where
+            res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
+          else
+            res = database.exec 'SELECT * FROM ' + table
           if res and res.length
             async.each res, (r, callback) ->
               delObj =
@@ -102,7 +108,7 @@ module.exports = (config) ->
               delObj[config.autoId or '_id'] = r[config.autoId] or r.id or r._id or r.i
               s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), delObj
               callback()
-      else if sql.indexOf('INSERT') isnt -1
+      else if /INSERT/i.test(sql)
         sql.replace /INSERT\s+INTO\s+(.+)\s+(SELECT|VALUES)/i, (all, table) ->
           if Object.prototype.toString.call(props[0]) is '[object Array]'
             for prop in props[0]

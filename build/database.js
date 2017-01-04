@@ -116,7 +116,7 @@
     attachDatabase();
     return {
       exec: function(sql, props, notCritical) {
-        var i, len, prop, ref;
+        var delReg, i, len, prop, ref;
         if (maintenanceMode) {
           return [];
         }
@@ -134,7 +134,7 @@
         if (notCritical || !config.awsBucket || !config.awsId || !config.awsKey) {
 
         } else {
-          if (sql.indexOf('UPDATE') !== -1) {
+          if (/UPDATE/i.test(sql)) {
             sql.replace(/UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i, function(all, table, set, where) {
               var noSetFields, res;
               noSetFields = (set.match(/\?/g) || []).length;
@@ -147,10 +147,18 @@
                 });
               }
             });
-          } else if (sql.indexOf('DELETE') !== -1) {
-            sql.replace(/DELETE\s+FROM\s+(.+)\s+WHERE\s+(.+)/i, function(all, table, where) {
+          } else if (/DELETE/i.test(sql)) {
+            delReg = /DELETE\s+FROM\s+([^\s]+)/i;
+            if (/WHERE/i.test(sql)) {
+              delReg = /DELETE\s+FROM\s+(.+)\s+WHERE\s+(.+)/i;
+            }
+            sql.replace(delReg, function(all, table, where) {
               var res;
-              res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
+              if (where) {
+                res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
+              } else {
+                res = database.exec('SELECT * FROM ' + table);
+              }
               if (res && res.length) {
                 return async.each(res, function(r, callback) {
                   var delObj;
@@ -163,7 +171,7 @@
                 });
               }
             });
-          } else if (sql.indexOf('INSERT') !== -1) {
+          } else if (/INSERT/i.test(sql)) {
             sql.replace(/INSERT\s+INTO\s+(.+)\s+(SELECT|VALUES)/i, function(all, table) {
               var j, len1, ref1, results;
               if (Object.prototype.toString.call(props[0]) === '[object Array]') {
