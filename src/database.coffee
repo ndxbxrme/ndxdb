@@ -9,6 +9,15 @@ module.exports = (config) ->
   s3 = require('./s3')(config)
   database = null
   maintenanceMode = false
+  getId = (row) ->
+    row[config.autoId] or row.id or row._id or row.i
+  getIdField = (row) ->
+    output = '_id'
+    if row[config.autoId] then output = config.autoId
+    else if row.id then output = 'id'
+    else if row._id then output = '_id'
+    else if row.i then output = 'i'
+    output
   attachDatabase = ->
     maintenanceMode = true
     alasql 'CREATE DATABASE ' + dbname
@@ -35,7 +44,7 @@ module.exports = (config) ->
               s3.get key.Key, (e, o) ->
                 if e
                   return callback()
-                idField = if config.autoId then config.autoId else if o._id then '_id' else if o.id then 'id' else 'i'
+                idField = getIdField o
                 if o[idField]
                   database.exec 'DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]
                   if not o['__!deleteMe!']
@@ -111,23 +120,23 @@ module.exports = (config) ->
             async.each res, (r, callback) ->
               delObj =
                 '__!deleteMe!': true
-              delObj[config.autoId or '_id'] = r[config.autoId] or r.id or r._id or r.i
-              s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), delObj
+              delObj[config.autoId or '_id'] = getId r
+              s3.put dbname + ':node:' + table + '/' + getId(r), delObj
               callback()
       else if /INSERT/i.test(sql)
         sql.replace /INSERT\s+INTO\s+(.+)\s+(SELECT|VALUES)/i, (all, table) ->
           if Object.prototype.toString.call(props[0]) is '[object Array]'
             for prop in props[0]
-              s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.id or prop._id or prop.i), prop
+              s3.put dbname + ':node:' + table + '/' + getId(prop), prop
           else
-            s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].id or props[0]._id or props[0].i), props[0]
+            s3.put dbname + ':node:' + table + '/' + getId(props[0]), props[0]
     output = database.exec sql, props
     if updateIds and updateIds.length
       async.each updateIds, (updateId, callback) ->
-        res = database.exec 'SELECT * FROM ' + updateTable + ' WHERE _id=?', [updateId._id]
+        res = database.exec 'SELECT * FROM ' + updateTable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]
         if res and res.length
           r = res[0]
-          s3.put dbname + ':node:' + updateTable + '/' + (r[config.autoId] or r.id or r._id or r.i), r
+          s3.put dbname + ':node:' + updateTable + '/' + getId(r), r
         callback()
     output
   maintenanceOn: ->

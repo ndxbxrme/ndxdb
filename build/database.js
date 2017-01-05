@@ -9,11 +9,28 @@
   ObjectID = require('bson-objectid');
 
   module.exports = function(config) {
-    var attachDatabase, database, dbname, maintenanceMode, s3;
+    var attachDatabase, database, dbname, getId, getIdField, maintenanceMode, s3;
     dbname = config.database || config.dbname || config.databaseName;
     s3 = require('./s3')(config);
     database = null;
     maintenanceMode = false;
+    getId = function(row) {
+      return row[config.autoId] || row.id || row._id || row.i;
+    };
+    getIdField = function(row) {
+      var output;
+      output = '_id';
+      if (row[config.autoId]) {
+        output = config.autoId;
+      } else if (row.id) {
+        output = 'id';
+      } else if (row._id) {
+        output = '_id';
+      } else if (row.i) {
+        output = 'i';
+      }
+      return output;
+    };
     attachDatabase = function() {
       var deleteKeys, i, inflate, len, ref, table;
       maintenanceMode = true;
@@ -55,7 +72,7 @@
                   if (e) {
                     return callback();
                   }
-                  idField = config.autoId ? config.autoId : o._id ? '_id' : o.id ? 'id' : 'i';
+                  idField = getIdField(o);
                   if (o[idField]) {
                     database.exec('DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]);
                     if (!o['__!deleteMe!']) {
@@ -171,8 +188,8 @@
                   delObj = {
                     '__!deleteMe!': true
                   };
-                  delObj[config.autoId || '_id'] = r[config.autoId] || r.id || r._id || r.i;
-                  s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.id || r._id || r.i), delObj);
+                  delObj[config.autoId || '_id'] = getId(r);
+                  s3.put(dbname + ':node:' + table + '/' + getId(r), delObj);
                   return callback();
                 });
               }
@@ -185,11 +202,11 @@
                 results = [];
                 for (j = 0, len1 = ref1.length; j < len1; j++) {
                   prop = ref1[j];
-                  results.push(s3.put(dbname + ':node:' + table + '/' + (prop[config.autoId] || prop.id || prop._id || prop.i), prop));
+                  results.push(s3.put(dbname + ':node:' + table + '/' + getId(prop), prop));
                 }
                 return results;
               } else {
-                return s3.put(dbname + ':node:' + table + '/' + (props[0][config.autoId] || props[0].id || props[0]._id || props[0].i), props[0]);
+                return s3.put(dbname + ':node:' + table + '/' + getId(props[0]), props[0]);
               }
             });
           }
@@ -198,10 +215,10 @@
         if (updateIds && updateIds.length) {
           async.each(updateIds, function(updateId, callback) {
             var r, res;
-            res = database.exec('SELECT * FROM ' + updateTable + ' WHERE _id=?', [updateId._id]);
+            res = database.exec('SELECT * FROM ' + updateTable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]);
             if (res && res.length) {
               r = res[0];
-              s3.put(dbname + ':node:' + updateTable + '/' + (r[config.autoId] || r.id || r._id || r.i), r);
+              s3.put(dbname + ':node:' + updateTable + '/' + getId(r), r);
             }
             return callback();
           });
