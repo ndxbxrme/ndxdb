@@ -116,7 +116,7 @@
     attachDatabase();
     return {
       exec: function(sql, props, notCritical) {
-        var delReg, i, len, prop, ref;
+        var delReg, i, len, output, prop, ref, upReg, updateIds, updateTable;
         if (maintenanceMode) {
           return [];
         }
@@ -131,20 +131,26 @@
             props[0][config.autoId] = ObjectID.generate();
           }
         }
+        updateIds = [];
+        updateTable = '';
         if (notCritical || !config.awsBucket || !config.awsId || !config.awsKey) {
 
         } else {
           if (/UPDATE/i.test(sql)) {
-            sql.replace(/UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i, function(all, table, set, where) {
-              var noSetFields, res;
+            upReg = /UPDATE\s+(.+)\s+SET\s+([^\s]+)/i;
+            if (/WHERE/i.test(sql)) {
+              upReg = /UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i;
+            }
+            sql.replace(upReg, function(all, table, set, where) {
+              var noSetFields, pCopy;
+              updateTable = table;
               noSetFields = (set.match(/\?/g) || []).length;
-              props.splice(noSetFields);
-              res = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, props);
-              if (res && res.length) {
-                return async.each(res, function(r, callback) {
-                  s3.put(dbname + ':node:' + table + '/' + (r[config.autoId] || r.id || r._id || r.i), r);
-                  return callback();
-                });
+              pCopy = JSON.parse(JSON.stringify(props));
+              pCopy.splice(0, noSetFields);
+              if (where) {
+                return updateIds = database.exec('SELECT * FROM ' + table + ' WHERE ' + where, pCopy);
+              } else {
+                return updateIds = database.exec('SELECT * FROM ' + table);
               }
             });
           } else if (/DELETE/i.test(sql)) {
@@ -188,7 +194,19 @@
             });
           }
         }
-        return database.exec(sql, props);
+        output = database.exec(sql, props);
+        if (updateIds && updateIds.length) {
+          async.each(updateIds, function(updateId, callback) {
+            var r, res;
+            res = database.exec('SELECT * FROM ' + updateTable + ' WHERE _id=?', [updateId._id]);
+            if (res && res.length) {
+              r = res[0];
+              s3.put(dbname + ':node:' + updateTable + '/' + (r[config.autoId] || r.id || r._id || r.i), r);
+            }
+            return callback();
+          });
+        }
+        return output;
       },
       maintenanceOn: function() {
         return maintenanceMode = true;

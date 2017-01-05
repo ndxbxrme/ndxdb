@@ -80,18 +80,24 @@ module.exports = (config) ->
           prop[config.autoId] = ObjectID.generate()
       else
         props[0][config.autoId] = ObjectID.generate()
+    updateIds = []
+    updateTable = ''
     if notCritical or not config.awsBucket or not config.awsId or not config.awsKey
       #do nothing
     else
       if /UPDATE/i.test(sql)
-        sql.replace /UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i, (all, table, set, where) ->
+        upReg = /UPDATE\s+(.+)\s+SET\s+([^\s]+)/i
+        if /WHERE/i.test(sql)
+          upReg = /UPDATE\s+(.+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i
+        sql.replace upReg, (all, table, set, where) ->
+          updateTable = table
           noSetFields = (set.match(/\?/g) or []).length
-          props.splice noSetFields
-          res = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, props
-          if res and res.length
-            async.each res, (r, callback) ->
-              s3.put dbname + ':node:' + table + '/' + (r[config.autoId] or r.id or r._id or r.i), r
-              callback()
+          pCopy = JSON.parse JSON.stringify props
+          pCopy.splice 0, noSetFields
+          if where
+            updateIds = database.exec 'SELECT * FROM ' + table + ' WHERE ' + where, pCopy
+          else
+            updateIds = database.exec 'SELECT * FROM ' + table
       else if /DELETE/i.test(sql)
         delReg = /DELETE\s+FROM\s+([^\s]+)/i
         if /WHERE/i.test(sql)
@@ -115,7 +121,15 @@ module.exports = (config) ->
               s3.put dbname + ':node:' + table + '/' + (prop[config.autoId] or prop.id or prop._id or prop.i), prop
           else
             s3.put dbname + ':node:' + table + '/' + (props[0][config.autoId] or props[0].id or props[0]._id or props[0].i), props[0]
-    database.exec sql, props
+    output = database.exec sql, props
+    if updateIds and updateIds.length
+      async.each updateIds, (updateId, callback) ->
+        res = database.exec 'SELECT * FROM ' + updateTable + ' WHERE _id=?', [updateId._id]
+        if res and res.length
+          r = res[0]
+          s3.put dbname + ':node:' + updateTable + '/' + (r[config.autoId] or r.id or r._id or r.i), r
+        callback()
+    output
   maintenanceOn: ->
     maintenanceMode = true
   maintenanceOff: ->
