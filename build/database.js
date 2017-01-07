@@ -128,6 +128,8 @@
             }
           });
         }, 11 * 60 * 60 * 1000);
+      } else {
+        return maintenanceMode = false;
       }
     };
     attachDatabase();
@@ -190,6 +192,13 @@
                   };
                   delObj[config.autoId || '_id'] = getId(r);
                   s3.put(dbname + ':node:' + table + '/' + getId(r), delObj);
+                  if (config.callbacks && config.callbacks["delete"]) {
+                    config.callbacks["delete"]({
+                      id: getId(r),
+                      table: table,
+                      obj: delObj
+                    });
+                  }
                   return callback();
                 });
               }
@@ -202,11 +211,27 @@
                 results = [];
                 for (j = 0, len1 = ref1.length; j < len1; j++) {
                   prop = ref1[j];
-                  results.push(s3.put(dbname + ':node:' + table + '/' + getId(prop), prop));
+                  s3.put(dbname + ':node:' + table + '/' + getId(prop), prop);
+                  if (config.callbacks && config.callbacks.insert) {
+                    results.push(config.callbacks.insert({
+                      id: getId(prop),
+                      table: table,
+                      obj: prop
+                    }));
+                  } else {
+                    results.push(void 0);
+                  }
                 }
                 return results;
               } else {
-                return s3.put(dbname + ':node:' + table + '/' + getId(props[0]), props[0]);
+                s3.put(dbname + ':node:' + table + '/' + getId(props[0]), props[0]);
+                if (config.callbacks && config.callbacks.insert) {
+                  return config.callbacks.insert({
+                    id: getId(props[0]),
+                    table: table,
+                    obj: props[0]
+                  });
+                }
               }
             });
           }
@@ -219,6 +244,13 @@
             if (res && res.length) {
               r = res[0];
               s3.put(dbname + ':node:' + updateTable + '/' + getId(r), r);
+              if (config.callbacks && config.callbacks.update) {
+                config.callbacks.update({
+                  id: getId(r),
+                  table: updateTable,
+                  obj: r
+                });
+              }
             }
             return callback();
           });

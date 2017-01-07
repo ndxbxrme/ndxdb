@@ -79,6 +79,8 @@ module.exports = (config) ->
           else
             maintenanceMode = false
       , 11 * 60 * 60 * 1000
+    else
+      maintenanceMode = false
   attachDatabase()
   exec: (sql, props, notCritical) ->
     if maintenanceMode
@@ -122,14 +124,29 @@ module.exports = (config) ->
                 '__!deleteMe!': true
               delObj[config.autoId or '_id'] = getId r
               s3.put dbname + ':node:' + table + '/' + getId(r), delObj
+              if config.callbacks and config.callbacks.delete
+                config.callbacks.delete
+                  id: getId r
+                  table: table
+                  obj: delObj
               callback()
       else if /INSERT/i.test(sql)
         sql.replace /INSERT\s+INTO\s+(.+)\s+(SELECT|VALUES)/i, (all, table) ->
           if Object.prototype.toString.call(props[0]) is '[object Array]'
             for prop in props[0]
               s3.put dbname + ':node:' + table + '/' + getId(prop), prop
+              if config.callbacks and config.callbacks.insert
+                config.callbacks.insert
+                  id: getId prop
+                  table: table
+                  obj: prop
           else
             s3.put dbname + ':node:' + table + '/' + getId(props[0]), props[0]
+            if config.callbacks and config.callbacks.insert
+              config.callbacks.insert
+                id: getId props[0]
+                table: table
+                obj: props[0]
     output = database.exec sql, props
     if updateIds and updateIds.length
       async.each updateIds, (updateId, callback) ->
@@ -137,6 +154,11 @@ module.exports = (config) ->
         if res and res.length
           r = res[0]
           s3.put dbname + ':node:' + updateTable + '/' + getId(r), r
+          if config.callbacks and config.callbacks.update
+            config.callbacks.update
+              id: getId r
+              table: updateTable
+              obj: r
         callback()
     output
   maintenanceOn: ->
