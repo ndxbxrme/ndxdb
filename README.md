@@ -70,7 +70,7 @@ most of the database configuration can be set as environment variables instead
 * AWS_BUCKET
 * AWS_REGION
 * AWS_ID
-* AWS_KEY 
+* AWS_KEY  
 in which case you can simplify your code 
 ```javascript
 var db = require('ndxdb')({
