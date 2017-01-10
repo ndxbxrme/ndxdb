@@ -1,16 +1,17 @@
 (function() {
   'use strict';
-  var AWS;
+  var AWS, settings;
+
+  settings = './settings';
 
   AWS = require('aws-sdk');
 
-  module.exports = function(config) {
-    var S3, dbname;
-    dbname = config.database || config.dbname || config.databaseName;
-    AWS.config.bucket = config.awsBucket;
-    AWS.config.region = config.awsRegion;
-    AWS.config.accessKeyId = config.awsId;
-    AWS.config.secretAccessKey = config.awsKey;
+  module.exports = function() {
+    var S3;
+    AWS.config.bucket = settings.AWS_BUCKET;
+    AWS.config.region = settings.AWS_REGION;
+    AWS.config.accessKeyId = settings.AWS_ID;
+    AWS.config.secretAccessKey = settings.AWS_KEY;
     S3 = new AWS.S3();
     return {
       dbs: function(cb) {
@@ -50,11 +51,6 @@
           ContentType: 'application/json'
         };
         return S3.putObject(m, function(e, r) {
-          if (e) {
-            console.log('put error', key);
-          } else {
-            console.log('put success', key);
-          }
           return typeof cb === "function" ? cb(e, r) : void 0;
         });
       },
@@ -70,7 +66,6 @@
             return typeof cb === "function" ? cb(e || 'error', null) : void 0;
           }
           d = null;
-          console.log('got', key);
           try {
             d = JSON.parse(r.Body);
           } catch (error) {

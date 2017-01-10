@@ -1,14 +1,15 @@
 'use strict'
 
+settings = './settings'
 AWS = require 'aws-sdk'
 
-module.exports = (config) ->
-  dbname = config.database or config.dbname or config.databaseName
-  AWS.config.bucket = config.awsBucket
-  AWS.config.region = config.awsRegion
-  AWS.config.accessKeyId = config.awsId
-  AWS.config.secretAccessKey = config.awsKey
+module.exports = ->
+  AWS.config.bucket = settings.AWS_BUCKET
+  AWS.config.region = settings.AWS_REGION
+  AWS.config.accessKeyId = settings.AWS_ID
+  AWS.config.secretAccessKey = settings.AWS_KEY
   S3 = new AWS.S3()
+  
   dbs: (cb) ->
     S3.listBuckets {}, (e, r) ->
       cb? e, r
@@ -33,10 +34,6 @@ module.exports = (config) ->
       Body: JSON.stringify o
       ContentType: 'application/json'
     S3.putObject m, (e, r) ->
-      if e
-        console.log 'put error', key
-      else
-        console.log 'put success', key
       cb? e, r
   get: (key, cb) ->
     m =
@@ -46,7 +43,6 @@ module.exports = (config) ->
       if e or not r.Body
         return cb?(e or 'error', null)
       d = null
-      console.log 'got', key
       try
         d = JSON.parse r.Body
       catch e

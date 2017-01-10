@@ -24,32 +24,61 @@ var db = require('ndxdb')({
   awsRegion: process.env.AWS_REGION || 'us-east-1',
   awsId: process.env.AWS_ID,
   awsKey: process.env.AWS_KEY,
-  autoId: '_id' //generate id's automatically
+  localStorage: 'data', //you can persist data to a local directory too
+  autoId: '_id', //generate id's automatically
+  callbacks: {
+    ready: function() { //database has been built/rebuilt and is ready to go
+      test();
+    }
+  } //there are also callbacks for insert, update and delete
 });
-var vals = [
-  {
-    country: 'China'
-    population: 1371220000
-  },{
-    country: 'India'
-    population: 1311050000
-  },{
-    country: 'United States'
-    population: 321418000
-  }
-];
-db.exec('INSERT INTO table1 SELECT * FROM ?', [vals]);
-var result = db.exec('SELECT * FROM table1 WHERE population > ? ORDER BY population ASC', [500000000]);
-/*
-result = [
-  {
-    country: 'India'
-    population: 1311050000
-  },{
-    country: 'China'
-    population: 1371220000
-  }
-]
-*/
+var test = function() {
+  var vals = [
+    {
+      country: 'China'
+      population: 1371220000
+    },{
+      country: 'India'
+      population: 1311050000
+    },{
+      country: 'United States'
+      population: 321418000
+    }
+  ];
+  db.exec('INSERT INTO table1 SELECT * FROM ?', [vals]);
+  var result = db.exec('SELECT * FROM table1 WHERE population > ? ORDER BY population ASC', [500000000]);
+  /*
+  result = [
+    {
+      country: 'India'
+      population: 1311050000
+    },{
+      country: 'China'
+      population: 1371220000
+    }
+  ]
+  */
+}
 ```
-if you don't set your AWS info then the database will work as an in-memory database with no persistence
+if you don't set your AWS info or a local storage directory then the database will work as an in-memory database with no persistence
+
+## Environment Variables
+most of the database configuration can be set as environment variables instead 
+* LOCAL_STORAGE
+* DATABASE
+* AUTO_ID
+* AWS_BUCKET
+* AWS_REGION
+* AWS_ID
+* AWS_KEY 
+in which case you can simplify your code 
+```javascript
+var db = require('ndxdb')({
+  tables: ['table1', 'table2']
+  callbacks: {
+    ready: function() {
+      //all good to go
+    }
+  }
+});
+```
