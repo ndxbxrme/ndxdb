@@ -2,7 +2,7 @@
   'use strict';
   var AWS, settings;
 
-  settings = './settings';
+  settings = require('./settings');
 
   AWS = require('aws-sdk');
 

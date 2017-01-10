@@ -25,9 +25,11 @@
     };
     checkDataDir = function() {
       var exists;
-      exists = fs.existsSync(path.join(settings.LOCAL_STORAGE));
-      if (!exists) {
-        return fs.mkdirSync(path.join(settings.LOCAL_STORAGE));
+      if (settings.LOCAL_STORAGE) {
+        exists = fs.existsSync(path.join(settings.LOCAL_STORAGE));
+        if (!exists) {
+          return fs.mkdirSync(path.join(settings.LOCAL_STORAGE));
+        }
       }
     };
     checkDataDir();

@@ -1,6 +1,6 @@
 'use strict'
 
-settings = './settings'
+settings = require './settings'
 AWS = require 'aws-sdk'
 
 module.exports = ->
@@ -9,7 +9,6 @@ module.exports = ->
   AWS.config.accessKeyId = settings.AWS_ID
   AWS.config.secretAccessKey = settings.AWS_KEY
   S3 = new AWS.S3()
-  
   dbs: (cb) ->
     S3.listBuckets {}, (e, r) ->
       cb? e, r
