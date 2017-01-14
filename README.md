@@ -4,8 +4,7 @@
 * useful for hobby projects on free servers (heroku) where you don't want the hassle of a database server and don't have reliable on-server file storage 
 
 # In development, think twice before using this!
-* ndxdb is currently intended for small (single server) projects and will not scale, though I reckon someone who is good with websockets could help me fix that (hint hint). 
-* you should only execute one INSERT, UPDATE OR DELETE command at a time (no chaining with ;) 
+* ndxdb is currently intended for small (single server) projects and will not scale, though I reckon someone who is good with websockets could help me fix that (hint hint).
 * every row in the database must have an id field (named id, _id or i).  id's can be generated automatically by using the `autoId` setting
 ```
   // examples of good inserts etc
@@ -17,7 +16,8 @@
 ## Usage
 `npm install --save ndxdb`
 ```javascript
-var db = require('ndxdb')({
+var db = require('ndxdb')
+.config({
   database: 'mydb', //database name - required
   tables: ['table1', 'table2'], //database tables - required
   awsBucket: process.env.AWS_BUCKET, //aws info
@@ -26,12 +26,12 @@ var db = require('ndxdb')({
   awsKey: process.env.AWS_KEY,
   localStorage: 'data', //you can persist data to a local directory too
   autoId: '_id', //generate id's automatically
-  callbacks: {
-    ready: function() { //database has been built/rebuilt and is ready to go
-      test();
-    }
-  } //there are also callbacks for insert, update and delete
-});
+})
+.on('ready', function() { //database has been built/rebuilt and is ready to go
+  test();
+}) //there are also callbacks for insert, update and delete
+.start(); // call start() to get things going
+
 var test = function() {
   var vals = [
     {
@@ -73,12 +73,9 @@ most of the database configuration can be set as environment variables instead
 * AWS_KEY  
 in which case you can simplify your code 
 ```javascript
-var db = require('ndxdb')({
+var db = require('ndxdb')
+.config({
   tables: ['table1', 'table2']
-  callbacks: {
-    ready: function() {
-      //all good to go
-    }
-  }
-});
+})
+.start();
 ```

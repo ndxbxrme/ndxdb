@@ -1,17 +1,14 @@
 (function() {
   var db, test;
 
-  db = require('../database.js')({
+  db = require('../database.js').config({
     database: 'testdb',
     tables: ['table1', 'table2'],
     autoId: '_id',
-    localStorage: './data',
-    callbacks: {
-      ready: function() {
-        return test();
-      }
-    }
-  });
+    localStorage: './data'
+  }).on('ready', function() {
+    return test();
+  }).start();
 
   test = function() {
     var result, vals;

@@ -1,11 +1,13 @@
 db = require('../database.js')
+.config
   database: 'testdb'
   tables: ['table1', 'table2']
   autoId: '_id'
   localStorage: './data'
-  callbacks:
-    ready: ->
-      test()
+.on 'ready', ->
+  test()
+.start()
+
 test = ->
   if not db.maintenance()
     vals = [
