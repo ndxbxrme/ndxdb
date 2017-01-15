@@ -67,6 +67,7 @@ most of the database configuration can be set as environment variables instead
 * LOCAL_STORAGE
 * DATABASE
 * AUTO_ID
+* AUTO_DATE
 * AWS_BUCKET
 * AWS_REGION
 * AWS_ID

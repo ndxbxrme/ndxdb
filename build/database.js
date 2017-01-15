@@ -221,7 +221,7 @@
       return safeCallback(type, args);
     },
     exec: function(sql, props, notCritical) {
-      var args, ast, hash, hh, idProps, idWhere, isDelete, isInsert, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
+      var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
       if (maintenanceMode) {
         return [];
       }
@@ -250,12 +250,22 @@
       }
       args = [].slice.call(arguments);
       args.splice(0, 3);
+      error = '';
       ref = ast.statements;
       for (j = 0, len = ref.length; j < len; j++) {
         statement = ref[j];
+        table = '';
+        if (statement.into) {
+          table = statement.into.tableid;
+        } else if (statement.table) {
+          table = statement.table.tableid;
+        } else if (statement.from && statement.from.lenth) {
+          table = statement.from[0].tableid;
+        }
         isUpdate = statement instanceof alasql.yy.Update;
         isInsert = statement instanceof alasql.yy.Insert;
         isDelete = statement instanceof alasql.yy.Delete;
+        isSelect = statement instanceof alasql.yy.Select;
         if (settings.AUTO_ID && isInsert) {
           if (Object.prototype.toString.call(props[0]) === '[object Array]') {
             ref1 = props[0];
@@ -279,14 +289,12 @@
               return '?';
             });
           }
-          table = statement.into ? statement.into.tableid : statement.table.tableid;
           updateIds = database.exec('SELECT *, \'' + table + '\' as ndxtable FROM ' + table + idWhere, idProps);
         } else if (isDelete) {
           idWhere = '';
           if (statement.where) {
             idWhere = ' WHERE ' + statement.where.toString().replace(/\$(\d+)/g, '?');
           }
-          table = statement.into ? statement.into.tableid : statement.table.tableid;
           res = database.exec('SELECT * FROM ' + table + idWhere, props);
           if (res && res.length) {
             async.each(res, function(r, callback) {
@@ -305,7 +313,6 @@
             });
           }
         } else if (isInsert) {
-          table = statement.into ? statement.into.tableid : statement.table.tableid;
           if (Object.prototype.toString.call(props[0]) === '[object Array]') {
             ref2 = props[0];
             for (l = 0, len2 = ref2.length; l < len2; l++) {
@@ -355,6 +362,9 @@
           }
           return callback();
         });
+      }
+      if (error) {
+        output.error = error;
       }
       return output;
     },

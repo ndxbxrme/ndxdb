@@ -161,10 +161,17 @@ module.exports =
       sqlCache[hh] = ast
     args = [].slice.call arguments
     args.splice 0, 3
+    error = ''
     for statement in ast.statements
+      table = ''
+      if statement.into then table = statement.into.tableid
+      else if statement.table then table = statement.table.tableid
+      else if statement.from and statement.from.lenth then table = statement.from[0].tableid
       isUpdate = statement instanceof alasql.yy.Update
       isInsert = statement instanceof alasql.yy.Insert
       isDelete = statement instanceof alasql.yy.Delete
+      isSelect = statement instanceof alasql.yy.Select
+      
       if settings.AUTO_ID and isInsert
         if Object.prototype.toString.call(props[0]) is '[object Array]'
           for prop in props[0]
@@ -180,13 +187,11 @@ module.exports =
             if props.length > +p
               idProps.push props[+p]
             '?'
-        table = if statement.into then statement.into.tableid else statement.table.tableid
         updateIds = database.exec 'SELECT *, \'' + table + '\' as ndxtable FROM ' + table + idWhere, idProps
       else if isDelete
         idWhere = ''
         if statement.where
           idWhere = ' WHERE ' + statement.where.toString().replace /\$(\d+)/g, '?'
-        table = if statement.into then statement.into.tableid else statement.table.tableid
         res = database.exec 'SELECT * FROM ' + table + idWhere, props
         if res and res.length
           async.each res, (r, callback) ->
@@ -200,7 +205,6 @@ module.exports =
               obj: delObj
             callback()
       else if isInsert
-        table = if statement.into then statement.into.tableid else statement.table.tableid
         if Object.prototype.toString.call(props[0]) is '[object Array]'
           for prop in props[0]
             if settings.AUTO_DATE
@@ -235,6 +239,8 @@ module.exports =
             obj: r
             args: args
         callback()
+    if error
+      output.error = error
     output
   maintenanceOn: ->
     maintenanceMode = true
