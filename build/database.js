@@ -1,6 +1,8 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, getId, getIdField, maintenanceMode, resetSqlCache, safeCallback, settings, sqlCache, sqlCacheSize, storage;
+  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, fs, getId, getIdField, maintenanceMode, resetSqlCache, safeCallback, settings, sqlCache, sqlCacheSize, storage;
+
+  fs = require('fs');
 
   alasql = require('alasql');
 
@@ -183,6 +185,7 @@
       settings.AWS_ID = config.awsId || settings.AWS_ID;
       settings.AWS_KEY = config.awsKey || settings.AWS_KEY;
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
+      storage.checkDataDir();
       return this;
     },
     start: function() {

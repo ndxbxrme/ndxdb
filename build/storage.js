@@ -9,6 +9,11 @@
     s3 = require('./s3')();
     local = require('./local')();
     return {
+      checkDataDir: function() {
+        if (settings.LOCAL_STORAGE) {
+          return local.checkDataDir();
+        }
+      },
       keys: function(from, prefix, cb) {
         if (!settings.PREFER_LOCAL) {
           if (settings.LOCAL_STORAGE) {
@@ -52,6 +57,7 @@
         }
       },
       put: function(key, o, cb, notCritical) {
+        console.log('put', settings.LOCAL_STORAGE);
         if (settings.LOCAL_STORAGE) {
           return local.put(key, o, function(e, r) {
             if (settings.AWS_OK && (!notCritical)) {

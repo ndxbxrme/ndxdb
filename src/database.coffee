@@ -1,5 +1,6 @@
 'use strict'
 
+fs = require 'fs'
 alasql = require 'alasql'
 async = require 'async'
 ObjectID = require 'bson-objectid'
@@ -111,6 +112,7 @@ module.exports =
     settings.AWS_ID = config.awsId or settings.AWS_ID
     settings.AWS_KEY = config.awsKey or settings.AWS_KEY
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
+    storage.checkDataDir()
     @
   start: ->
     attachDatabase()

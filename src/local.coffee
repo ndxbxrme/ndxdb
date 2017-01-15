@@ -14,12 +14,11 @@ module.exports = ->
     key = key.replace /££/g, '/'
     regex = new RegExp '^' + path.join(settings.LOCAL_STORAGE) + '\\\/'
     key.replace regex, ''
-  checkDataDir = ->
+  checkDataDir: ->
     if settings.LOCAL_STORAGE
       exists = fs.existsSync path.join(settings.LOCAL_STORAGE)
       if not exists
         fs.mkdirSync path.join(settings.LOCAL_STORAGE)
-  checkDataDir()
   keys: (from, prefix, cb) ->
     glob path.join(settings.LOCAL_STORAGE, clean(prefix) + '*.json'), (e, r) ->
       if e

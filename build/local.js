@@ -11,7 +11,7 @@
   path = require('path');
 
   module.exports = function() {
-    var checkDataDir, clean, unclean;
+    var clean, unclean;
     clean = function(key) {
       key = key.replace(/:/g, '%%');
       return key.replace(/\//g, '££');
@@ -23,17 +23,16 @@
       regex = new RegExp('^' + path.join(settings.LOCAL_STORAGE) + '\\\/');
       return key.replace(regex, '');
     };
-    checkDataDir = function() {
-      var exists;
-      if (settings.LOCAL_STORAGE) {
-        exists = fs.existsSync(path.join(settings.LOCAL_STORAGE));
-        if (!exists) {
-          return fs.mkdirSync(path.join(settings.LOCAL_STORAGE));
-        }
-      }
-    };
-    checkDataDir();
     return {
+      checkDataDir: function() {
+        var exists;
+        if (settings.LOCAL_STORAGE) {
+          exists = fs.existsSync(path.join(settings.LOCAL_STORAGE));
+          if (!exists) {
+            return fs.mkdirSync(path.join(settings.LOCAL_STORAGE));
+          }
+        }
+      },
       keys: function(from, prefix, cb) {
         return glob(path.join(settings.LOCAL_STORAGE, clean(prefix) + '*.json'), function(e, r) {
           var count, gotFrom, i, output;

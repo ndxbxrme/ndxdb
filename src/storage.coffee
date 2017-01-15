@@ -5,6 +5,9 @@ settings = require './settings'
 module.exports = ->
   s3 = require('./s3')()
   local = require('./local')()
+  checkDataDir: ->
+    if settings.LOCAL_STORAGE
+      local.checkDataDir()
   keys: (from, prefix, cb) ->
     if not settings.PREFER_LOCAL
       if settings.LOCAL_STORAGE
@@ -36,6 +39,7 @@ module.exports = ->
     else if settings.AWS_OK
       s3.del key, cb
   put: (key, o, cb, notCritical) ->
+    console.log 'put', settings.LOCAL_STORAGE
     if settings.LOCAL_STORAGE
       local.put key, o, (e, r) ->
         if settings.AWS_OK and (not notCritical)
