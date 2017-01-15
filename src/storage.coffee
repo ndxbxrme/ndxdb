@@ -39,7 +39,6 @@ module.exports = ->
     else if settings.AWS_OK
       s3.del key, cb
   put: (key, o, cb, notCritical) ->
-    console.log 'put', settings.LOCAL_STORAGE
     if settings.LOCAL_STORAGE
       local.put key, o, (e, r) ->
         if settings.AWS_OK and (not notCritical)

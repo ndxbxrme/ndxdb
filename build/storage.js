@@ -57,7 +57,6 @@
         }
       },
       put: function(key, o, cb, notCritical) {
-        console.log('put', settings.LOCAL_STORAGE);
         if (settings.LOCAL_STORAGE) {
           return local.put(key, o, function(e, r) {
             if (settings.AWS_OK && (!notCritical)) {
