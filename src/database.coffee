@@ -2,6 +2,7 @@
 
 fs = require 'fs'
 alasql = require 'alasql'
+require('./alasql-patch') alasql
 async = require 'async'
 ObjectID = require 'bson-objectid'
 settings = require './settings'
@@ -257,3 +258,4 @@ module.exports =
       if not e
         console.log 'database uploaded'
       cb?()
+  alasql: alasql

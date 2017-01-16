@@ -6,6 +6,8 @@
 
   alasql = require('alasql');
 
+  require('./alasql-patch')(alasql);
+
   async = require('async');
 
   ObjectID = require('bson-objectid');
@@ -390,7 +392,8 @@
         }
         return typeof cb === "function" ? cb() : void 0;
       });
-    }
+    },
+    alasql: alasql
   };
 
 }).call(this);
