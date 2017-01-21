@@ -360,7 +360,7 @@
             storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
             safeCallback('update', {
               id: getId(r),
-              table: updateTable,
+              table: updateId.ndxtable,
               obj: r,
               args: args
             });
