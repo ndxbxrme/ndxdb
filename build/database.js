@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, fs, getId, getIdField, maintenanceMode, resetSqlCache, safeCallback, settings, sqlCache, sqlCacheSize, storage;
+  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, fs, getId, getIdField, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, settings, sqlCache, sqlCacheSize, storage;
 
   fs = require('fs');
 
@@ -37,7 +37,19 @@
     ready: [],
     insert: [],
     update: [],
-    "delete": []
+    "delete": [],
+    restore: []
+  };
+
+  restoreDatabase = function(data) {
+    var key;
+    for (key in o) {
+      if (database.tables[key]) {
+        database.exec('DELETE FROM ' + key);
+        database.exec('INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]);
+      }
+    }
+    return safeCallback('restore', database);
   };
 
   getId = function(row) {
@@ -135,13 +147,8 @@
     };
     if (settings.AWS_OK || settings.LOCAL_STORAGE) {
       return storage.get(settings.DATABASE + ':database', function(e, o) {
-        var key;
         if (!e && o) {
-          for (key in o) {
-            if (database.tables[key]) {
-              database.tables[key].data = o[key].data;
-            }
-          }
+          restoreDatabase(o);
         }
         return inflate(null, function() {
           return deleteKeys(function() {
@@ -384,6 +391,11 @@
     },
     getDb: function() {
       return database.tables;
+    },
+    restoreFromBackup: function(data) {
+      if (data) {
+        return restoreDatabase(data);
+      }
     },
     uploadDatabase: function(cb) {
       return storage.put(settings.DATABASE + ':database', database.tables, function(e) {

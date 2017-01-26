@@ -21,6 +21,13 @@ callbacks =
   insert: []
   update: []
   delete: []
+  restore: []
+restoreDatabase = (data) ->
+  for key of o
+    if database.tables[key]
+      database.exec 'DELETE FROM ' + key
+      database.exec 'INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]
+  safeCallback 'restore', database
 getId = (row) ->
   row[settings.AUTO_ID] or row.id or row._id or row.i
 getIdField = (row) ->
@@ -75,9 +82,7 @@ attachDatabase = ->
   if settings.AWS_OK or settings.LOCAL_STORAGE
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o
-        for key of o
-          if database.tables[key]
-            database.tables[key].data = o[key].data
+        restoreDatabase o
       inflate null, ->
         deleteKeys ->
           storage.put settings.DATABASE + ':database', database.tables, (e) ->
@@ -253,6 +258,9 @@ module.exports =
     maintenanceMode
   getDb: ->
     database.tables
+  restoreFromBackup: (data) ->
+    if data
+      restoreDatabase data
   uploadDatabase: (cb) ->
     storage.put settings.DATABASE + ':database', database.tables, (e) ->
       if not e
