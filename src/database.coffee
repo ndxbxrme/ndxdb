@@ -23,7 +23,7 @@ callbacks =
   delete: []
   restore: []
 restoreDatabase = (data) ->
-  for key of o
+  for key of data
     if database.tables[key]
       database.exec 'DELETE FROM ' + key
       database.exec 'INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]

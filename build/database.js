@@ -43,7 +43,7 @@
 
   restoreDatabase = function(data) {
     var key;
-    for (key in o) {
+    for (key in data) {
       if (database.tables[key]) {
         database.exec('DELETE FROM ' + key);
         database.exec('INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]);
