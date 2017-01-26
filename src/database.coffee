@@ -22,12 +22,13 @@ callbacks =
   update: []
   delete: []
   restore: []
-restoreDatabase = (data) ->
+restoreDatabase = (data, cb) ->
   for key of data
     if database.tables[key]
       database.exec 'DELETE FROM ' + key
       database.exec 'INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]
   safeCallback 'restore', database
+  cb?()
 getId = (row) ->
   row[settings.AUTO_ID] or row.id or row._id or row.i
 getIdField = (row) ->
@@ -40,6 +41,44 @@ getIdField = (row) ->
 safeCallback = (name, obj) ->
   for cb in callbacks[name]
     cb obj
+deleteKeys = (cb) ->
+  storage.keys null, settings.DATABASE + ':node:', (e, r) ->
+    if not e and r and r.Contents
+      for key in r.Contents
+        storage.del key.Key
+    if r.IsTruncated
+      deleteKeys cb
+    else
+      cb()
+inflate = (from, cb) ->
+  storage.keys from, settings.DATABASE + ':node:', (e, r) ->
+    if e or not r.Contents
+      return console.log 'error', e
+    async.eachSeries r.Contents, (key, callback) ->
+      key.Key.replace /(.+):(.+):(.+)\/(.+)/, (all, db, type, table, id) ->
+        if db and table and id and db is settings.DATABASE
+          storage.get key.Key, (e, o) ->
+            if e
+              return callback()
+            idField = getIdField o
+            if o[idField]
+              database.exec 'DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]
+              if not o['__!deleteMe!']
+                database.exec 'INSERT INTO ' + table + ' VALUES ?', [o]
+            return callback()
+        else
+          callback()
+    , ->
+      if r.IsTruncated
+        inflate r.Contents[r.Contents.length-1].Key, cb
+      else
+        cb()
+saveDatabase = ->
+  storage.put settings.DATABASE + ':database', database.tables, (e) ->
+    if not e
+      console.log 'database updated and uploaded'
+    maintenanceMode = false
+    safeCallback 'ready', database
 attachDatabase = ->
   maintenanceMode = true
   alasql 'CREATE DATABASE ' + settings.DATABASE
@@ -47,49 +86,13 @@ attachDatabase = ->
   for table in config.tables
     alasql 'CREATE TABLE ' + table
   database = alasql.databases[settings.DATABASE]
-  deleteKeys = (cb) ->
-    storage.keys null, settings.DATABASE + ':node:', (e, r) ->
-      if not e and r and r.Contents
-        for key in r.Contents
-          storage.del key.Key
-      if r.IsTruncated
-        deleteKeys cb
-      else
-        cb()
-  inflate = (from, cb) ->
-    storage.keys from, settings.DATABASE + ':node:', (e, r) ->
-      if e or not r.Contents
-        return console.log 'error', e
-      async.eachSeries r.Contents, (key, callback) ->
-        key.Key.replace /(.+):(.+):(.+)\/(.+)/, (all, db, type, table, id) ->
-          if db and table and id and db is settings.DATABASE
-            storage.get key.Key, (e, o) ->
-              if e
-                return callback()
-              idField = getIdField o
-              if o[idField]
-                database.exec 'DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]
-                if not o['__!deleteMe!']
-                  database.exec 'INSERT INTO ' + table + ' VALUES ?', [o]
-              return callback()
-          else
-            callback()
-      , ->
-        if r.IsTruncated
-          inflate r.Contents[r.Contents.length-1].Key, cb
-        else
-          cb()
   if settings.AWS_OK or settings.LOCAL_STORAGE
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o
         restoreDatabase o
       inflate null, ->
         deleteKeys ->
-          storage.put settings.DATABASE + ':database', database.tables, (e) ->
-            if not e
-              console.log 'database updated and uploaded'
-            maintenanceMode = false
-            safeCallback 'ready', database
+          saveDatabase()
     ###
     setInterval ->
       maintenanceMode = true
@@ -260,7 +263,9 @@ module.exports =
     database.tables
   restoreFromBackup: (data) ->
     if data
-      restoreDatabase data
+      restoreDatabase data, ->
+        deleteKeys ->
+          saveDatabase()
   uploadDatabase: (cb) ->
     storage.put settings.DATABASE + ':database', database.tables, (e) ->
       if not e

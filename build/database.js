@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, fs, getId, getIdField, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, settings, sqlCache, sqlCacheSize, storage;
+  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, fs, getId, getIdField, inflate, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage;
 
   fs = require('fs');
 
@@ -41,7 +41,7 @@
     restore: []
   };
 
-  restoreDatabase = function(data) {
+  restoreDatabase = function(data, cb) {
     var key;
     for (key in data) {
       if (database.tables[key]) {
@@ -49,7 +49,8 @@
         database.exec('INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]);
       }
     }
-    return safeCallback('restore', database);
+    safeCallback('restore', database);
+    return typeof cb === "function" ? cb() : void 0;
   };
 
   getId = function(row) {
@@ -82,8 +83,72 @@
     return results;
   };
 
+  deleteKeys = function(cb) {
+    return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
+      var j, key, len, ref;
+      if (!e && r && r.Contents) {
+        ref = r.Contents;
+        for (j = 0, len = ref.length; j < len; j++) {
+          key = ref[j];
+          storage.del(key.Key);
+        }
+      }
+      if (r.IsTruncated) {
+        return deleteKeys(cb);
+      } else {
+        return cb();
+      }
+    });
+  };
+
+  inflate = function(from, cb) {
+    return storage.keys(from, settings.DATABASE + ':node:', function(e, r) {
+      if (e || !r.Contents) {
+        return console.log('error', e);
+      }
+      return async.eachSeries(r.Contents, function(key, callback) {
+        return key.Key.replace(/(.+):(.+):(.+)\/(.+)/, function(all, db, type, table, id) {
+          if (db && table && id && db === settings.DATABASE) {
+            return storage.get(key.Key, function(e, o) {
+              var idField;
+              if (e) {
+                return callback();
+              }
+              idField = getIdField(o);
+              if (o[idField]) {
+                database.exec('DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]);
+                if (!o['__!deleteMe!']) {
+                  database.exec('INSERT INTO ' + table + ' VALUES ?', [o]);
+                }
+              }
+              return callback();
+            });
+          } else {
+            return callback();
+          }
+        });
+      }, function() {
+        if (r.IsTruncated) {
+          return inflate(r.Contents[r.Contents.length - 1].Key, cb);
+        } else {
+          return cb();
+        }
+      });
+    });
+  };
+
+  saveDatabase = function() {
+    return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
+      if (!e) {
+        console.log('database updated and uploaded');
+      }
+      maintenanceMode = false;
+      return safeCallback('ready', database);
+    });
+  };
+
   attachDatabase = function() {
-    var deleteKeys, inflate, j, len, ref, table;
+    var j, len, ref, table;
     maintenanceMode = true;
     alasql('CREATE DATABASE ' + settings.DATABASE);
     alasql('USE ' + settings.DATABASE);
@@ -93,58 +158,6 @@
       alasql('CREATE TABLE ' + table);
     }
     database = alasql.databases[settings.DATABASE];
-    deleteKeys = function(cb) {
-      return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
-        var k, key, len1, ref1;
-        if (!e && r && r.Contents) {
-          ref1 = r.Contents;
-          for (k = 0, len1 = ref1.length; k < len1; k++) {
-            key = ref1[k];
-            storage.del(key.Key);
-          }
-        }
-        if (r.IsTruncated) {
-          return deleteKeys(cb);
-        } else {
-          return cb();
-        }
-      });
-    };
-    inflate = function(from, cb) {
-      return storage.keys(from, settings.DATABASE + ':node:', function(e, r) {
-        if (e || !r.Contents) {
-          return console.log('error', e);
-        }
-        return async.eachSeries(r.Contents, function(key, callback) {
-          return key.Key.replace(/(.+):(.+):(.+)\/(.+)/, function(all, db, type, table, id) {
-            if (db && table && id && db === settings.DATABASE) {
-              return storage.get(key.Key, function(e, o) {
-                var idField;
-                if (e) {
-                  return callback();
-                }
-                idField = getIdField(o);
-                if (o[idField]) {
-                  database.exec('DELETE FROM ' + table + ' WHERE ' + idField + '=?', [o[idField]]);
-                  if (!o['__!deleteMe!']) {
-                    database.exec('INSERT INTO ' + table + ' VALUES ?', [o]);
-                  }
-                }
-                return callback();
-              });
-            } else {
-              return callback();
-            }
-          });
-        }, function() {
-          if (r.IsTruncated) {
-            return inflate(r.Contents[r.Contents.length - 1].Key, cb);
-          } else {
-            return cb();
-          }
-        });
-      });
-    };
     if (settings.AWS_OK || settings.LOCAL_STORAGE) {
       return storage.get(settings.DATABASE + ':database', function(e, o) {
         if (!e && o) {
@@ -152,13 +165,7 @@
         }
         return inflate(null, function() {
           return deleteKeys(function() {
-            return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
-              if (!e) {
-                console.log('database updated and uploaded');
-              }
-              maintenanceMode = false;
-              return safeCallback('ready', database);
-            });
+            return saveDatabase();
           });
         });
       });
@@ -394,7 +401,11 @@
     },
     restoreFromBackup: function(data) {
       if (data) {
-        return restoreDatabase(data);
+        return restoreDatabase(data, function() {
+          return deleteKeys(function() {
+            return saveDatabase();
+          });
+        });
       }
     },
     uploadDatabase: function(cb) {
