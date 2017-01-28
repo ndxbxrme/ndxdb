@@ -7,6 +7,7 @@ async = require 'async'
 ObjectID = require 'bson-objectid'
 settings = require './settings'
 storage = require('./storage')()
+varsion = require('../package.json').version
 database = null
 sqlCache = {}
 sqlCacheSize = 0
@@ -76,8 +77,8 @@ inflate = (from, cb) ->
         cb?()
 saveDatabase = (cb) ->
   storage.put settings.DATABASE + ':database', database.tables, (e) ->
-    if not e
-      console.log 'database updated and uploaded'
+    #if not e
+    #  console.log 'database updated and uploaded'
     maintenanceMode = false
     cb?()
 attachDatabase = ->
@@ -94,6 +95,7 @@ attachDatabase = ->
       inflate null, ->
         deleteKeys ->
           saveDatabase ->
+            console.log "ndxdb v#{version} ready"
             safeCallback 'ready', database
     ###
     setInterval ->
