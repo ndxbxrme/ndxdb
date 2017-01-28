@@ -13,13 +13,13 @@
   module.exports = function() {
     var clean, unclean;
     clean = function(key) {
-      key = key.replace(/:/g, '%%');
-      return key.replace(/\//g, '££');
+      key = key.replace(/:/g, 'IDBI');
+      return key.replace(/\//g, 'IIDI');
     };
     unclean = function(key) {
       var regex;
-      key = key.replace(/%%/g, ':');
-      key = key.replace(/££/g, '/');
+      key = key.replace(/IDBI/g, ':');
+      key = key.replace(/IIDI/g, '/');
       regex = new RegExp('^' + path.join(settings.LOCAL_STORAGE) + '\\\/');
       return key.replace(regex, '');
     };
@@ -65,7 +65,9 @@
         });
       },
       del: function(key, cb) {
-        fs.unlinkSync(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
+        try {
+          fs.unlinkSync(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
+        } catch (undefined) {}
         return typeof cb === "function" ? cb(null, null) : void 0;
       },
       put: function(key, o, cb) {

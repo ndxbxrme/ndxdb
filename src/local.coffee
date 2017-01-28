@@ -7,11 +7,11 @@ path = require 'path'
 
 module.exports = ->
   clean = (key) ->
-    key = key.replace /:/g, '%%'
-    key.replace /\//g, '££'
+    key = key.replace /:/g, 'IDBI'
+    key.replace /\//g, 'IIDI'
   unclean = (key) ->
-    key = key.replace /%%/g, ':'
-    key = key.replace /££/g, '/'
+    key = key.replace /IDBI/g, ':'
+    key = key.replace /IIDI/g, '/'
     regex = new RegExp '^' + path.join(settings.LOCAL_STORAGE) + '\\\/'
     key.replace regex, ''
   checkDataDir: ->
@@ -41,7 +41,8 @@ module.exports = ->
         output.IsTruncated = true
       cb? null, output
   del: (key, cb) ->
-    fs.unlinkSync path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
+    try
+      fs.unlinkSync path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
     cb? null, null
   put: (key, o, cb) ->
     uri = path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
