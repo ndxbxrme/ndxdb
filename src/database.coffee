@@ -47,7 +47,8 @@ deleteKeys = (cb) ->
       for key in r.Contents
         storage.del key.Key
     if r.IsTruncated
-      deleteKeys cb
+      process.nextTick ->
+        deleteKeys cb
     else
       cb()
 inflate = (from, cb) ->
@@ -72,13 +73,13 @@ inflate = (from, cb) ->
       if r.IsTruncated
         inflate r.Contents[r.Contents.length-1].Key, cb
       else
-        cb()
-saveDatabase = ->
+        cb?()
+saveDatabase = (cb) ->
   storage.put settings.DATABASE + ':database', database.tables, (e) ->
     if not e
       console.log 'database updated and uploaded'
     maintenanceMode = false
-    safeCallback 'ready', database
+    cb?()
 attachDatabase = ->
   maintenanceMode = true
   alasql 'CREATE DATABASE ' + settings.DATABASE
@@ -92,7 +93,8 @@ attachDatabase = ->
         restoreDatabase o
       inflate null, ->
         deleteKeys ->
-          saveDatabase()
+          saveDatabase ->
+            safeCallback 'ready', database
     ###
     setInterval ->
       maintenanceMode = true
@@ -266,9 +268,13 @@ module.exports =
       restoreDatabase data, ->
         deleteKeys ->
           saveDatabase()
+  consolidate: ->
+    deleteKeys ->
+      saveDatabase()
   uploadDatabase: (cb) ->
-    storage.put settings.DATABASE + ':database', database.tables, (e) ->
-      if not e
-        console.log 'database uploaded'
-      cb?()
+    deleteKeys ->
+      storage.put settings.DATABASE + ':database', database.tables, (e) ->
+        if not e
+          console.log 'database uploaded'
+        cb?()
   alasql: alasql

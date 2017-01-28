@@ -43,6 +43,8 @@ module.exports = ->
   del: (key, cb) ->
     try
       fs.unlinkSync path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
+    #catch e
+    #  console.log "delete error #{e}"
     cb? null, null
   put: (key, o, cb) ->
     uri = path.join(settings.LOCAL_STORAGE, clean(key) + '.json')

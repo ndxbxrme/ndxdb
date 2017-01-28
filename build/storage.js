@@ -58,13 +58,15 @@
       },
       put: function(key, o, cb, notCritical) {
         if (settings.LOCAL_STORAGE) {
-          return local.put(key, o, function(e, r) {
-            if (settings.AWS_OK && (!notCritical)) {
-              return s3.put(key, o, cb);
-            } else {
-              return typeof cb === "function" ? cb(e, r) : void 0;
-            }
-          });
+          if (!notCritical) {
+            return local.put(key, o, function(e, r) {
+              if (settings.AWS_OK) {
+                return s3.put(key, o, cb);
+              } else {
+                return typeof cb === "function" ? cb(e, r) : void 0;
+              }
+            });
+          }
         } else if (settings.AWS_OK && (!notCritical)) {
           return s3.put(key, o, cb);
         } else {

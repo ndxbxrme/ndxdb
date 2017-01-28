@@ -40,11 +40,12 @@ module.exports = ->
       s3.del key, cb
   put: (key, o, cb, notCritical) ->
     if settings.LOCAL_STORAGE
-      local.put key, o, (e, r) ->
-        if settings.AWS_OK and (not notCritical)
-          s3.put key, o, cb
-        else
-          cb? e, r
+      if not notCritical
+        local.put key, o, (e, r) ->
+          if settings.AWS_OK
+            s3.put key, o, cb
+          else
+            cb? e, r
     else if settings.AWS_OK and (not notCritical)
       s3.put key, o, cb
     else

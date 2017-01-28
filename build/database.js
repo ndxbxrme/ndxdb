@@ -94,7 +94,9 @@
         }
       }
       if (r.IsTruncated) {
-        return deleteKeys(cb);
+        return process.nextTick(function() {
+          return deleteKeys(cb);
+        });
       } else {
         return cb();
       }
@@ -131,19 +133,19 @@
         if (r.IsTruncated) {
           return inflate(r.Contents[r.Contents.length - 1].Key, cb);
         } else {
-          return cb();
+          return typeof cb === "function" ? cb() : void 0;
         }
       });
     });
   };
 
-  saveDatabase = function() {
+  saveDatabase = function(cb) {
     return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
       if (!e) {
         console.log('database updated and uploaded');
       }
       maintenanceMode = false;
-      return safeCallback('ready', database);
+      return typeof cb === "function" ? cb() : void 0;
     });
   };
 
@@ -165,7 +167,9 @@
         }
         return inflate(null, function() {
           return deleteKeys(function() {
-            return saveDatabase();
+            return saveDatabase(function() {
+              return safeCallback('ready', database);
+            });
           });
         });
       });
@@ -408,12 +412,19 @@
         });
       }
     },
+    consolidate: function() {
+      return deleteKeys(function() {
+        return saveDatabase();
+      });
+    },
     uploadDatabase: function(cb) {
-      return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
-        if (!e) {
-          console.log('database uploaded');
-        }
-        return typeof cb === "function" ? cb() : void 0;
+      return deleteKeys(function() {
+        return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
+          if (!e) {
+            console.log('database uploaded');
+          }
+          return typeof cb === "function" ? cb() : void 0;
+        });
       });
     },
     alasql: alasql
