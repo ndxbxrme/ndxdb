@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, fs, getId, getIdField, inflate, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage;
+  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, fs, getId, getIdField, inflate, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, varsion;
 
   fs = require('fs');
 
@@ -15,6 +15,8 @@
   settings = require('./settings');
 
   storage = require('./storage')();
+
+  varsion = require('../package.json').version;
 
   database = null;
 
@@ -141,9 +143,6 @@
 
   saveDatabase = function(cb) {
     return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
-      if (!e) {
-        console.log('database updated and uploaded');
-      }
       maintenanceMode = false;
       return typeof cb === "function" ? cb() : void 0;
     });
@@ -168,6 +167,7 @@
         return inflate(null, function() {
           return deleteKeys(function() {
             return saveDatabase(function() {
+              console.log("ndxdb v" + version + " ready");
               return safeCallback('ready', database);
             });
           });
