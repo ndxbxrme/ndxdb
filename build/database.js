@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, fs, getId, getIdField, inflate, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, varsion;
+  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, fs, getId, getIdField, inflate, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, version;
 
   fs = require('fs');
 
@@ -16,7 +16,7 @@
 
   storage = require('./storage')();
 
-  varsion = require('../package.json').version;
+  version = require('../package.json').version;
 
   database = null;
 
