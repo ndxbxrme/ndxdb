@@ -80,3 +80,70 @@ var db = require('ndxdb')
 })
 .start();
 ```
+
+### Methods
+<a name="methods"></a>
+#### `db.config(object args) -> db`
+
+Configure the database
+
+#### `db.start() -> db`
+
+Start the database
+
+#### `db.on(string callbackName, function callbackFn) -> db`
+
+Register a callback
+- *`ready`*  - the database is ready to use
+- *`restore`* - the database has been restored from a backup
+- *`insert`* - data has been inserted into the database
+- *`update`* - data has been updated in the database
+- *`delete`* - data has been deleted
+
+#### `db.off(string callbackName, function callback) -> db`
+
+Unregister a callback
+
+#### `db.exec(string sql, array props, bool notCritical) -> data`
+
+Execute an SQL command
+
+#### `db.serverExec(string type, object args)`
+
+Used internally
+
+#### `db.maintenanceOn()`
+
+Turn on maintenance mode
+
+#### `db.maintenanceOff()`
+
+Turn off maintenance mode
+
+#### `db.restoreFromBackup(ndxdb data)`
+
+Restore the database from a backup
+
+#### `db.consolidate()`
+
+Cleans up data fragments and saves the main database file
+
+#### `db.maintenanceOn()`
+
+Turn on maintenance mode
+
+### Properties
+<a name="properties"></a>
+#### `db.alasql`
+
+The current [alasql](https://github.com/agershun/alasql) instance 
+
+
+
+
+
+
+
+
+
+
