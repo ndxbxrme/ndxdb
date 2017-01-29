@@ -2,9 +2,6 @@
 * a cheap and easy in-memory sql database for nodejs projects that persits to S3 
 * built on top of the mighty [alasql](https://github.com/agershun/alasql)
 * useful for hobby projects on free servers (heroku) where you don't want the hassle of a database server and don't have reliable on-server file storage 
-
-# In development, think twice before using this!
-* ndxdb is currently intended for small (single server) projects and will not scale, though I reckon someone who is good with websockets could help me fix that (hint hint).
 * every row in the database must have an id field (named id, _id or i).  id's can be generated automatically by using the `autoId` setting
 ```
   // examples of good inserts etc
@@ -119,6 +116,14 @@ Turn on maintenance mode
 #### `db.maintenanceOff()`
 
 Turn off maintenance mode
+
+#### `db.maintenance() -> bool`
+
+Get the maintenance mode status of the database
+
+#### `db.getDb() -> ndxdb`
+
+Gets a reference to the current database
 
 #### `db.restoreFromBackup(ndxdb data)`
 
