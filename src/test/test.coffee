@@ -24,6 +24,6 @@ test = ->
         population: 321418000
       }
     ];
-    db.exec 'INSERT INTO table1 SELECT * FROM ?', [vals]
+    db.upsert 'table1', vals[0], 'country=?', [vals[0].country]
     result = db.exec 'SELECT * FROM table1 WHERE population > ? ORDER BY population ASC', [500000000]
     console.log 'result', result

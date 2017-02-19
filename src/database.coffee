@@ -112,6 +112,123 @@ attachDatabase = ->
   else
     maintenanceMode = false
     safeCallback 'ready', database
+exec = (sql, props, notCritical) ->
+  if maintenanceMode
+    return []
+  hash = (str) ->
+    h = 5381
+    i = str.length
+    while i
+      h = (h * 33) ^ str.charCodeAt --i
+    h
+  hh = hash sql
+  ast = sqlCache[hh]
+  if not ast
+    ast = alasql.parse sql
+  if not (ast.statements and ast.statements.length)
+    return []
+  else
+    if sqlCacheSize > MAXSQLCACHESIZE
+      resetSqlCache()
+    sqlCacheSize++
+    sqlCache[hh] = ast
+  args = [].slice.call arguments
+  args.splice 0, 3
+  error = ''
+  for statement in ast.statements
+    table = ''
+    if statement.into then table = statement.into.tableid
+    else if statement.table then table = statement.table.tableid
+    else if statement.from and statement.from.lenth then table = statement.from[0].tableid
+    isUpdate = statement instanceof alasql.yy.Update
+    isInsert = statement instanceof alasql.yy.Insert
+    isDelete = statement instanceof alasql.yy.Delete
+    isSelect = statement instanceof alasql.yy.Select
+
+    if settings.AUTO_ID and isInsert
+      if Object.prototype.toString.call(props[0]) is '[object Array]'
+        for prop in props[0]
+          prop[settings.AUTO_ID] = ObjectID.generate()
+      else
+        props[0][settings.AUTO_ID] = ObjectID.generate()
+    updateIds = []
+    if isUpdate
+      idWhere = ''
+      idProps = []
+      if statement.where
+        idWhere = ' WHERE ' + statement.where.toString().replace /\$(\d+)/g, (all, p) ->
+          if props.length > +p
+            idProps.push props[+p]
+          '?'
+      updateIds = database.exec 'SELECT *, \'' + table + '\' as ndxtable FROM ' + table + idWhere, idProps
+    else if isDelete
+      idWhere = ''
+      if statement.where
+        idWhere = ' WHERE ' + statement.where.toString().replace /\$(\d+)/g, '?'
+      res = database.exec 'SELECT * FROM ' + table + idWhere, props
+      if res and res.length
+        async.each res, (r, callback) ->
+          delObj =
+            '__!deleteMe!': true
+          delObj[getIdField(r)] = getId r
+          storage.put settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical
+          safeCallback 'delete', 
+            id: getId r
+            table: table
+            obj: delObj
+          callback()
+    else if isInsert
+      if Object.prototype.toString.call(props[0]) is '[object Array]'
+        for prop in props[0]
+          if settings.AUTO_DATE
+            prop.u = new Date().valueOf()
+          storage.put settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical
+          safeCallback 'insert', 
+            id: getId prop
+            table: table
+            obj: prop
+            args: args
+      else
+        if settings.AUTO_DATE
+          props[0].u = new Date().valueOf();
+        storage.put settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical
+        safeCallback 'insert',
+          id: getId props[0]
+          table: table
+          obj: props[0]
+          args: args
+  output = database.exec sql, props    
+  if updateIds and updateIds.length
+    async.each updateIds, (updateId, callback) ->
+      if settings.AUTO_DATE
+        database.exec 'UPDATE ' + updateId.ndxtable + ' SET u=? WHERE ' + getIdField(updateId) + '=?', [new Date().valueOf(), getId(updateId)]
+      res = database.exec 'SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]
+      if res and res.length
+        r = res[0]
+        storage.put settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical
+        safeCallback 'update',
+          id: getId r
+          table: updateId.ndxtable
+          obj: r
+          args: args
+      callback()
+  if error
+    output.error = error
+  output
+update = (table, obj, whereSql, whereProps) ->
+  updateSql = []
+  updateProps = []
+  for key of obj
+    if whereProps.indexOf(obj[key]) is -1
+      updateSql.push " #{key}=? "
+      updateProps.push obj[key]
+  props = updateProps.concat whereProps
+  exec "UPDATE #{table} SET #{updateSql.join(',')} WHERE #{whereSql}", props
+insert = (table, obj) ->
+  if Object.prototype.toString.call(obj) is '[object Array]'
+    exec "INSERT INTO #{table} SELECT * FROM ?", [obj]
+  else
+    exec "INSERT INTO #{table} VALUES ?", [obj]
 module.exports =
   config: (_config) ->
     config = _config
@@ -154,109 +271,16 @@ module.exports =
       delObj[idField] = args.id
       storage.put settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true
     safeCallback type, args
-  exec: (sql, props, notCritical) ->
-    if maintenanceMode
-      return []
-    hash = (str) ->
-      h = 5381
-      i = str.length
-      while i
-        h = (h * 33) ^ str.charCodeAt --i
-      h
-    hh = hash sql
-    ast = sqlCache[hh]
-    if not ast
-      ast = alasql.parse sql
-    if not (ast.statements and ast.statements.length)
-      return []
+  exec: exec
+  update: update
+  insert: insert
+  upsert: (table, obj, whereSql, whereProps) ->
+    test = database.exec "SELECT * FROM #{table} WHERE #{whereSql}", whereProps
+    if test and test.length
+      update table, obj, whereSql, whereProps
     else
-      if sqlCacheSize > MAXSQLCACHESIZE
-        resetSqlCache()
-      sqlCacheSize++
-      sqlCache[hh] = ast
-    args = [].slice.call arguments
-    args.splice 0, 3
-    error = ''
-    for statement in ast.statements
-      table = ''
-      if statement.into then table = statement.into.tableid
-      else if statement.table then table = statement.table.tableid
-      else if statement.from and statement.from.lenth then table = statement.from[0].tableid
-      isUpdate = statement instanceof alasql.yy.Update
-      isInsert = statement instanceof alasql.yy.Insert
-      isDelete = statement instanceof alasql.yy.Delete
-      isSelect = statement instanceof alasql.yy.Select
-      
-      if settings.AUTO_ID and isInsert
-        if Object.prototype.toString.call(props[0]) is '[object Array]'
-          for prop in props[0]
-            prop[settings.AUTO_ID] = ObjectID.generate()
-        else
-          props[0][settings.AUTO_ID] = ObjectID.generate()
-      updateIds = []
-      if isUpdate
-        idWhere = ''
-        idProps = []
-        if statement.where
-          idWhere = ' WHERE ' + statement.where.toString().replace /\$(\d+)/g, (all, p) ->
-            if props.length > +p
-              idProps.push props[+p]
-            '?'
-        updateIds = database.exec 'SELECT *, \'' + table + '\' as ndxtable FROM ' + table + idWhere, idProps
-      else if isDelete
-        idWhere = ''
-        if statement.where
-          idWhere = ' WHERE ' + statement.where.toString().replace /\$(\d+)/g, '?'
-        res = database.exec 'SELECT * FROM ' + table + idWhere, props
-        if res and res.length
-          async.each res, (r, callback) ->
-            delObj =
-              '__!deleteMe!': true
-            delObj[getIdField(r)] = getId r
-            storage.put settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical
-            safeCallback 'delete', 
-              id: getId r
-              table: table
-              obj: delObj
-            callback()
-      else if isInsert
-        if Object.prototype.toString.call(props[0]) is '[object Array]'
-          for prop in props[0]
-            if settings.AUTO_DATE
-              prop.u = new Date().valueOf()
-            storage.put settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical
-            safeCallback 'insert', 
-              id: getId prop
-              table: table
-              obj: prop
-              args: args
-        else
-          if settings.AUTO_DATE
-            props[0].u = new Date().valueOf();
-          storage.put settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical
-          safeCallback 'insert',
-            id: getId props[0]
-            table: table
-            obj: props[0]
-            args: args
-    output = database.exec sql, props    
-    if updateIds and updateIds.length
-      async.each updateIds, (updateId, callback) ->
-        if settings.AUTO_DATE
-          database.exec 'UPDATE ' + updateId.ndxtable + ' SET u=? WHERE ' + getIdField(updateId) + '=?', [new Date().valueOf(), getId(updateId)]
-        res = database.exec 'SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]
-        if res and res.length
-          r = res[0]
-          storage.put settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical
-          safeCallback 'update',
-            id: getId r
-            table: updateId.ndxtable
-            obj: r
-            args: args
-        callback()
-    if error
-      output.error = error
-    output
+      insert table, obj
+    
   maintenanceOn: ->
     maintenanceMode = true
   maintenanceOff: ->

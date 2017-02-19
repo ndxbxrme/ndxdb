@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, fs, getId, getIdField, inflate, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, version;
+  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, update, version;
 
   fs = require('fs');
 
@@ -192,6 +192,177 @@
     }
   };
 
+  exec = function(sql, props, notCritical) {
+    var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
+    if (maintenanceMode) {
+      return [];
+    }
+    hash = function(str) {
+      var h, i;
+      h = 5381;
+      i = str.length;
+      while (i) {
+        h = (h * 33) ^ str.charCodeAt(--i);
+      }
+      return h;
+    };
+    hh = hash(sql);
+    ast = sqlCache[hh];
+    if (!ast) {
+      ast = alasql.parse(sql);
+    }
+    if (!(ast.statements && ast.statements.length)) {
+      return [];
+    } else {
+      if (sqlCacheSize > MAXSQLCACHESIZE) {
+        resetSqlCache();
+      }
+      sqlCacheSize++;
+      sqlCache[hh] = ast;
+    }
+    args = [].slice.call(arguments);
+    args.splice(0, 3);
+    error = '';
+    ref = ast.statements;
+    for (j = 0, len = ref.length; j < len; j++) {
+      statement = ref[j];
+      table = '';
+      if (statement.into) {
+        table = statement.into.tableid;
+      } else if (statement.table) {
+        table = statement.table.tableid;
+      } else if (statement.from && statement.from.lenth) {
+        table = statement.from[0].tableid;
+      }
+      isUpdate = statement instanceof alasql.yy.Update;
+      isInsert = statement instanceof alasql.yy.Insert;
+      isDelete = statement instanceof alasql.yy.Delete;
+      isSelect = statement instanceof alasql.yy.Select;
+      if (settings.AUTO_ID && isInsert) {
+        if (Object.prototype.toString.call(props[0]) === '[object Array]') {
+          ref1 = props[0];
+          for (k = 0, len1 = ref1.length; k < len1; k++) {
+            prop = ref1[k];
+            prop[settings.AUTO_ID] = ObjectID.generate();
+          }
+        } else {
+          props[0][settings.AUTO_ID] = ObjectID.generate();
+        }
+      }
+      updateIds = [];
+      if (isUpdate) {
+        idWhere = '';
+        idProps = [];
+        if (statement.where) {
+          idWhere = ' WHERE ' + statement.where.toString().replace(/\$(\d+)/g, function(all, p) {
+            if (props.length > +p) {
+              idProps.push(props[+p]);
+            }
+            return '?';
+          });
+        }
+        updateIds = database.exec('SELECT *, \'' + table + '\' as ndxtable FROM ' + table + idWhere, idProps);
+      } else if (isDelete) {
+        idWhere = '';
+        if (statement.where) {
+          idWhere = ' WHERE ' + statement.where.toString().replace(/\$(\d+)/g, '?');
+        }
+        res = database.exec('SELECT * FROM ' + table + idWhere, props);
+        if (res && res.length) {
+          async.each(res, function(r, callback) {
+            var delObj;
+            delObj = {
+              '__!deleteMe!': true
+            };
+            delObj[getIdField(r)] = getId(r);
+            storage.put(settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical);
+            safeCallback('delete', {
+              id: getId(r),
+              table: table,
+              obj: delObj
+            });
+            return callback();
+          });
+        }
+      } else if (isInsert) {
+        if (Object.prototype.toString.call(props[0]) === '[object Array]') {
+          ref2 = props[0];
+          for (l = 0, len2 = ref2.length; l < len2; l++) {
+            prop = ref2[l];
+            if (settings.AUTO_DATE) {
+              prop.u = new Date().valueOf();
+            }
+            storage.put(settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical);
+            safeCallback('insert', {
+              id: getId(prop),
+              table: table,
+              obj: prop,
+              args: args
+            });
+          }
+        } else {
+          if (settings.AUTO_DATE) {
+            props[0].u = new Date().valueOf();
+          }
+          storage.put(settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical);
+          safeCallback('insert', {
+            id: getId(props[0]),
+            table: table,
+            obj: props[0],
+            args: args
+          });
+        }
+      }
+    }
+    output = database.exec(sql, props);
+    if (updateIds && updateIds.length) {
+      async.each(updateIds, function(updateId, callback) {
+        var r;
+        if (settings.AUTO_DATE) {
+          database.exec('UPDATE ' + updateId.ndxtable + ' SET u=? WHERE ' + getIdField(updateId) + '=?', [new Date().valueOf(), getId(updateId)]);
+        }
+        res = database.exec('SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]);
+        if (res && res.length) {
+          r = res[0];
+          storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
+          safeCallback('update', {
+            id: getId(r),
+            table: updateId.ndxtable,
+            obj: r,
+            args: args
+          });
+        }
+        return callback();
+      });
+    }
+    if (error) {
+      output.error = error;
+    }
+    return output;
+  };
+
+  update = function(table, obj, whereSql, whereProps) {
+    var key, props, updateProps, updateSql;
+    updateSql = [];
+    updateProps = [];
+    for (key in obj) {
+      if (whereProps.indexOf(obj[key]) === -1) {
+        updateSql.push(" " + key + "=? ");
+        updateProps.push(obj[key]);
+      }
+    }
+    props = updateProps.concat(whereProps);
+    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + " WHERE " + whereSql, props);
+  };
+
+  insert = function(table, obj) {
+    if (Object.prototype.toString.call(obj) === '[object Array]') {
+      return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj]);
+    } else {
+      return exec("INSERT INTO " + table + " VALUES ?", [obj]);
+    }
+  };
+
   module.exports = {
     config: function(_config) {
       config = _config;
@@ -243,153 +414,17 @@
       }
       return safeCallback(type, args);
     },
-    exec: function(sql, props, notCritical) {
-      var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
-      if (maintenanceMode) {
-        return [];
-      }
-      hash = function(str) {
-        var h, i;
-        h = 5381;
-        i = str.length;
-        while (i) {
-          h = (h * 33) ^ str.charCodeAt(--i);
-        }
-        return h;
-      };
-      hh = hash(sql);
-      ast = sqlCache[hh];
-      if (!ast) {
-        ast = alasql.parse(sql);
-      }
-      if (!(ast.statements && ast.statements.length)) {
-        return [];
+    exec: exec,
+    update: update,
+    insert: insert,
+    upsert: function(table, obj, whereSql, whereProps) {
+      var test;
+      test = database.exec("SELECT * FROM " + table + " WHERE " + whereSql, whereProps);
+      if (test && test.length) {
+        return update(table, obj, whereSql, whereProps);
       } else {
-        if (sqlCacheSize > MAXSQLCACHESIZE) {
-          resetSqlCache();
-        }
-        sqlCacheSize++;
-        sqlCache[hh] = ast;
+        return insert(table, obj);
       }
-      args = [].slice.call(arguments);
-      args.splice(0, 3);
-      error = '';
-      ref = ast.statements;
-      for (j = 0, len = ref.length; j < len; j++) {
-        statement = ref[j];
-        table = '';
-        if (statement.into) {
-          table = statement.into.tableid;
-        } else if (statement.table) {
-          table = statement.table.tableid;
-        } else if (statement.from && statement.from.lenth) {
-          table = statement.from[0].tableid;
-        }
-        isUpdate = statement instanceof alasql.yy.Update;
-        isInsert = statement instanceof alasql.yy.Insert;
-        isDelete = statement instanceof alasql.yy.Delete;
-        isSelect = statement instanceof alasql.yy.Select;
-        if (settings.AUTO_ID && isInsert) {
-          if (Object.prototype.toString.call(props[0]) === '[object Array]') {
-            ref1 = props[0];
-            for (k = 0, len1 = ref1.length; k < len1; k++) {
-              prop = ref1[k];
-              prop[settings.AUTO_ID] = ObjectID.generate();
-            }
-          } else {
-            props[0][settings.AUTO_ID] = ObjectID.generate();
-          }
-        }
-        updateIds = [];
-        if (isUpdate) {
-          idWhere = '';
-          idProps = [];
-          if (statement.where) {
-            idWhere = ' WHERE ' + statement.where.toString().replace(/\$(\d+)/g, function(all, p) {
-              if (props.length > +p) {
-                idProps.push(props[+p]);
-              }
-              return '?';
-            });
-          }
-          updateIds = database.exec('SELECT *, \'' + table + '\' as ndxtable FROM ' + table + idWhere, idProps);
-        } else if (isDelete) {
-          idWhere = '';
-          if (statement.where) {
-            idWhere = ' WHERE ' + statement.where.toString().replace(/\$(\d+)/g, '?');
-          }
-          res = database.exec('SELECT * FROM ' + table + idWhere, props);
-          if (res && res.length) {
-            async.each(res, function(r, callback) {
-              var delObj;
-              delObj = {
-                '__!deleteMe!': true
-              };
-              delObj[getIdField(r)] = getId(r);
-              storage.put(settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical);
-              safeCallback('delete', {
-                id: getId(r),
-                table: table,
-                obj: delObj
-              });
-              return callback();
-            });
-          }
-        } else if (isInsert) {
-          if (Object.prototype.toString.call(props[0]) === '[object Array]') {
-            ref2 = props[0];
-            for (l = 0, len2 = ref2.length; l < len2; l++) {
-              prop = ref2[l];
-              if (settings.AUTO_DATE) {
-                prop.u = new Date().valueOf();
-              }
-              storage.put(settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical);
-              safeCallback('insert', {
-                id: getId(prop),
-                table: table,
-                obj: prop,
-                args: args
-              });
-            }
-          } else {
-            if (settings.AUTO_DATE) {
-              props[0].u = new Date().valueOf();
-            }
-            storage.put(settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical);
-            safeCallback('insert', {
-              id: getId(props[0]),
-              table: table,
-              obj: props[0],
-              args: args
-            });
-          }
-        }
-      }
-      output = database.exec(sql, props);
-      if (updateIds && updateIds.length) {
-        async.each(updateIds, function(updateId, callback) {
-          var r;
-          if (settings.AUTO_DATE) {
-            database.exec('UPDATE ' + updateId.ndxtable + ' SET u=? WHERE ' + getIdField(updateId) + '=?', [new Date().valueOf(), getId(updateId)]);
-          }
-          res = database.exec('SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]);
-          if (res && res.length) {
-            r = res[0];
-            storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
-            safeCallback('update', {
-              id: getId(r),
-              table: updateId.ndxtable,
-              obj: r,
-              args: args
-            });
-          }
-          return callback();
-        });
-      }
-      if (error) {
-        output.error = error;
-      }
-      return output;
     },
     maintenanceOn: function() {
       return maintenanceMode = true;
