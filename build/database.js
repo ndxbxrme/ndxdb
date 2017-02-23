@@ -436,6 +436,9 @@
     maintenanceOff: function() {
       return maintenanceMode = false;
     },
+    version: function() {
+      return version;
+    },
     maintenance: function() {
       return maintenanceMode;
     },

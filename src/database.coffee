@@ -288,6 +288,8 @@ module.exports =
     maintenanceMode = true
   maintenanceOff: ->
     maintenanceMode = false
+  version: ->
+    version
   maintenance: ->
     maintenanceMode
   getDb: ->
