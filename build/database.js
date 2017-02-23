@@ -442,6 +442,9 @@
     getDb: function() {
       return database.tables;
     },
+    cacheSize: function() {
+      return database.sqlCacheSize;
+    },
     restoreFromBackup: function(data) {
       if (data) {
         return restoreDatabase(data, function() {

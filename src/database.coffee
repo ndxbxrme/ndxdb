@@ -292,6 +292,8 @@ module.exports =
     maintenanceMode
   getDb: ->
     database.tables
+  cacheSize: ->
+    database.sqlCacheSize
   restoreFromBackup: (data) ->
     if data
       restoreDatabase data, ->
