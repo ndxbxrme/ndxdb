@@ -39,6 +39,7 @@
     ready: [],
     insert: [],
     update: [],
+    select: [],
     "delete": [],
     restore: []
   };
@@ -334,6 +335,9 @@
         }
         return callback();
       });
+    }
+    if (isSelect) {
+      safeCallback('select', null);
     }
     if (error) {
       output.error = error;

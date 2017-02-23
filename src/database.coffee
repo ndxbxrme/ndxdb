@@ -21,6 +21,7 @@ callbacks =
   ready: []
   insert: []
   update: []
+  select: []
   delete: []
   restore: []
 restoreDatabase = (data, cb) ->
@@ -212,6 +213,8 @@ exec = (sql, props, notCritical) ->
           obj: r
           args: args
       callback()
+  if isSelect
+    safeCallback 'select', null
   if error
     output.error = error
   output
