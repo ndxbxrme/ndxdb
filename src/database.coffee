@@ -89,7 +89,7 @@ attachDatabase = ->
     alasql 'CREATE TABLE ' + table
   database = alasql.databases[settings.DATABASE]
   if settings.MAXSQLCACHESIZE
-    database.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE
+    alasql.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE
   if settings.AWS_OK or settings.LOCAL_STORAGE
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o

@@ -159,7 +159,7 @@
     }
     database = alasql.databases[settings.DATABASE];
     if (settings.MAXSQLCACHESIZE) {
-      database.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE;
+      alasql.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE;
     }
     if (settings.AWS_OK || settings.LOCAL_STORAGE) {
       return storage.get(settings.DATABASE + ':database', function(e, o) {
