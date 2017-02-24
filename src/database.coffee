@@ -14,7 +14,6 @@ sqlCacheSize = 0
 resetSqlCache = ->
   sqlCache = {}
   sqlCacheSize = 0
-MAXSQLCACHESIZE = 1000
 config = {}
 maintenanceMode = false
 callbacks =
@@ -89,6 +88,8 @@ attachDatabase = ->
   for table in config.tables
     alasql 'CREATE TABLE ' + table
   database = alasql.databases[settings.DATABASE]
+  if settings.MAXSQLCACHESIZE
+    database.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE
   if settings.AWS_OK or settings.LOCAL_STORAGE
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o
@@ -129,7 +130,7 @@ exec = (sql, props, notCritical) ->
   if not (ast.statements and ast.statements.length)
     return []
   else
-    if sqlCacheSize > MAXSQLCACHESIZE
+    if sqlCacheSize > database.MAXSQLCACHESIZE
       resetSqlCache()
     sqlCacheSize++
     sqlCache[hh] = ast
@@ -244,6 +245,7 @@ module.exports =
     settings.AWS_REGION = config.awsRegion or settings.AWS_REGION
     settings.AWS_ID = config.awsId or settings.AWS_ID
     settings.AWS_KEY = config.awsKey or settings.AWS_KEY
+    settings.MAXSQLCACHESIZE = config.maxSqlCacheSize or settings.MAXSQLCACHESIZE
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     storage.checkDataDir()
     @
@@ -310,4 +312,6 @@ module.exports =
         if not e
           console.log 'database uploaded'
         cb?()
+  resetSqlCache: ->
+    database.resetSqlCache()
   alasql: alasql

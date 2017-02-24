@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var MAXSQLCACHESIZE, ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, update, version;
+  var ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, update, version;
 
   fs = require('fs');
 
@@ -28,8 +28,6 @@
     sqlCache = {};
     return sqlCacheSize = 0;
   };
-
-  MAXSQLCACHESIZE = 1000;
 
   config = {};
 
@@ -160,6 +158,9 @@
       alasql('CREATE TABLE ' + table);
     }
     database = alasql.databases[settings.DATABASE];
+    if (settings.MAXSQLCACHESIZE) {
+      database.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE;
+    }
     if (settings.AWS_OK || settings.LOCAL_STORAGE) {
       return storage.get(settings.DATABASE + ':database', function(e, o) {
         if (!e && o) {
@@ -215,7 +216,7 @@
     if (!(ast.statements && ast.statements.length)) {
       return [];
     } else {
-      if (sqlCacheSize > MAXSQLCACHESIZE) {
+      if (sqlCacheSize > database.MAXSQLCACHESIZE) {
         resetSqlCache();
       }
       sqlCacheSize++;
@@ -379,6 +380,7 @@
       settings.AWS_REGION = config.awsRegion || settings.AWS_REGION;
       settings.AWS_ID = config.awsId || settings.AWS_ID;
       settings.AWS_KEY = config.awsKey || settings.AWS_KEY;
+      settings.MAXSQLCACHESIZE = config.maxSqlCacheSize || settings.MAXSQLCACHESIZE;
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
       storage.checkDataDir();
       return this;
@@ -471,6 +473,9 @@
           return typeof cb === "function" ? cb() : void 0;
         });
       });
+    },
+    resetSqlCache: function() {
+      return database.resetSqlCache();
     },
     alasql: alasql
   };
