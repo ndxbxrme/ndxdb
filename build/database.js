@@ -416,7 +416,7 @@
       var key, keyC, keyU;
       for (key in config) {
         keyU = underscored(humanize(key)).toUpperCase();
-        keyC = camelize(_.humanize(key)).replace(/^./, key[0].toLowerCase());
+        keyC = camelize(humanize(key)).replace(/^./, key[0].toLowerCase());
         settings[keyU] = config[keyC] || settings[keyU];
       }
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;

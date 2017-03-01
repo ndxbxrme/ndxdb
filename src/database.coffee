@@ -273,7 +273,7 @@ module.exports =
   config: (config) ->
     for key of config
       keyU = underscored(humanize(key)).toUpperCase()
-      keyC = camelize(_.humanize(key)).replace(/^./, key[0].toLowerCase())
+      keyC = camelize(humanize(key)).replace(/^./, key[0].toLowerCase())
       settings[keyU] = config[keyC] or settings[keyU]
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     storage.checkDataDir()
