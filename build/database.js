@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, attachDatabase, callbacks, config, database, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, update, version;
+  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, database, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, underscored, update, version;
 
   fs = require('fs');
 
@@ -16,6 +16,12 @@
 
   storage = require('./storage')();
 
+  underscored = require('underscore.string').underscored;
+
+  humanize = require('underscore.string').humanize;
+
+  camelize = require('underscore.string').camelize;
+
   version = require('../package.json').version;
 
   database = null;
@@ -28,8 +34,6 @@
     sqlCache = {};
     return sqlCacheSize = 0;
   };
-
-  config = {};
 
   maintenanceMode = false;
 
@@ -152,14 +156,14 @@
     maintenanceMode = true;
     alasql('CREATE DATABASE ' + settings.DATABASE);
     alasql('USE ' + settings.DATABASE);
-    ref = config.tables;
+    ref = settings.TABLES;
     for (j = 0, len = ref.length; j < len; j++) {
       table = ref[j];
       alasql('CREATE TABLE ' + table);
     }
     database = alasql.databases[settings.DATABASE];
-    if (settings.MAXSQLCACHESIZE) {
-      alasql.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE;
+    if (settings.MAX_SQL_CACHE_SIZE) {
+      alasql.MAXSQLCACHESIZE = settings.MAX_SQL_CACHE_SIZE;
     }
     if (settings.AWS_OK || settings.LOCAL_STORAGE) {
       return storage.get(settings.DATABASE + ':database', function(e, o) {
@@ -216,7 +220,7 @@
     if (!(ast.statements && ast.statements.length)) {
       return [];
     } else {
-      if (sqlCacheSize > database.MAXSQLCACHESIZE) {
+      if (sqlCacheSize > database.MAX_SQL_CACHE_SIZE) {
         resetSqlCache();
       }
       sqlCacheSize++;
@@ -346,18 +350,57 @@
     return output;
   };
 
-  update = function(table, obj, whereSql, whereProps) {
-    var key, props, updateProps, updateSql;
+  makeWhere = function(whereObj) {
+    var parent, parse, props, sql;
+    sql = '';
+    props = [];
+    parent = '';
+    parse = function(obj, op, comp) {
+      var key;
+      sql = '';
+      for (key in obj) {
+        if (key === '$or') {
+          sql += " " + op + " (" + (parse(obj[key], 'OR', comp)) + ")";
+        } else if (key === '$gt') {
+          sql += parse(obj[key], op, '>');
+        } else if (key === '$lt') {
+          sql += parse(obj[key], op, '<');
+        } else if (key === '$gte') {
+          sql += parse(obj[key], op, '>=');
+        } else if (key === '$lte') {
+          sql += parse(obj[key], op, '<=');
+        } else if (Object.prototype.toString.call(obj[key]) === '[object Object]') {
+          parent += key + '->';
+          sql += parse(obj[key], op, comp);
+        } else {
+          sql += " " + op + " " + parent + key + " " + comp + " ?";
+          props.push(obj[key]);
+          parent = '';
+          console.log(key);
+        }
+      }
+      return sql;
+    };
+    sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1');
+    return {
+      sql: sql,
+      props: props
+    };
+  };
+
+  update = function(table, obj, whereObj) {
+    var key, props, updateProps, updateSql, where;
     updateSql = [];
     updateProps = [];
+    where = makeWhere(whereObj);
     for (key in obj) {
-      if (whereProps.indexOf(obj[key]) === -1) {
+      if (where.props.indexOf(obj[key]) === -1) {
         updateSql.push(" " + key + "=? ");
         updateProps.push(obj[key]);
       }
     }
-    props = updateProps.concat(whereProps);
-    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + " WHERE " + whereSql, props);
+    props = updateProps.concat(where.props);
+    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + " WHERE " + where.sql, props);
   };
 
   insert = function(table, obj) {
@@ -369,18 +412,13 @@
   };
 
   module.exports = {
-    config: function(_config) {
-      config = _config;
-      settings.LOCAL_STORAGE = config.localStorage || config.local || settings.LOCAL_STORAGE;
-      settings.PREFER_LOCAL = config.preferLocal || settings.PREFER_LOCAL;
-      settings.DATABASE = config.database || config.dbname || config.databaseName || settings.DATABASE;
-      settings.AUTO_ID = config.autoId || settings.AUTO_ID;
-      settings.AUTO_DATE = config.autoDate || settings.AUTO_DATE;
-      settings.AWS_BUCKET = config.awsBucket || settings.AWS_BUCKET;
-      settings.AWS_REGION = config.awsRegion || settings.AWS_REGION;
-      settings.AWS_ID = config.awsId || settings.AWS_ID;
-      settings.AWS_KEY = config.awsKey || settings.AWS_KEY;
-      settings.MAXSQLCACHESIZE = config.maxSqlCacheSize || settings.MAXSQLCACHESIZE;
+    config: function(config) {
+      var key, keyC, keyU;
+      for (key in config) {
+        keyU = underscored(humanize(key)).toUpperCase();
+        keyC = camelize(_.humanize(key)).replace(/^./, key[0].toLowerCase());
+        settings[keyU] = config[keyC] || settings[keyU];
+      }
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
       storage.checkDataDir();
       return this;
@@ -421,13 +459,19 @@
       return safeCallback(type, args);
     },
     exec: exec,
+    select: function(table, whereObj) {
+      var where;
+      where = makeWhere(whereObj);
+      return database.exec("SELECT * FROM " + table + " WHERE " + where.sql, where.props);
+    },
     update: update,
     insert: insert,
-    upsert: function(table, obj, whereSql, whereProps) {
-      var test;
-      test = database.exec("SELECT * FROM " + table + " WHERE " + whereSql, whereProps);
+    upsert: function(table, obj, whereObj) {
+      var test, where;
+      where = makeWhere(whereObj);
+      test = database.exec("SELECT * FROM " + table + " WHERE " + where.sql, where.props);
       if (test && test.length) {
-        return update(table, obj, whereSql, whereProps);
+        return update(table, obj, whereObj);
       } else {
         return insert(table, obj);
       }

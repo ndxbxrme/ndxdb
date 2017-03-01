@@ -7,6 +7,9 @@ async = require 'async'
 ObjectID = require 'bson-objectid'
 settings = require './settings'
 storage = require('./storage')()
+underscored = require('underscore.string').underscored
+humanize = require('underscore.string').humanize
+camelize = require('underscore.string').camelize
 version = require('../package.json').version
 database = null
 sqlCache = {}
@@ -14,7 +17,6 @@ sqlCacheSize = 0
 resetSqlCache = ->
   sqlCache = {}
   sqlCacheSize = 0
-config = {}
 maintenanceMode = false
 callbacks =
   ready: []
@@ -85,11 +87,11 @@ attachDatabase = ->
   maintenanceMode = true
   alasql 'CREATE DATABASE ' + settings.DATABASE
   alasql 'USE ' + settings.DATABASE
-  for table in config.tables
+  for table in settings.TABLES
     alasql 'CREATE TABLE ' + table
   database = alasql.databases[settings.DATABASE]
-  if settings.MAXSQLCACHESIZE
-    alasql.MAXSQLCACHESIZE = settings.MAXSQLCACHESIZE
+  if settings.MAX_SQL_CACHE_SIZE
+    alasql.MAXSQLCACHESIZE = settings.MAX_SQL_CACHE_SIZE
   if settings.AWS_OK or settings.LOCAL_STORAGE
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o
@@ -130,7 +132,7 @@ exec = (sql, props, notCritical) ->
   if not (ast.statements and ast.statements.length)
     return []
   else
-    if sqlCacheSize > database.MAXSQLCACHESIZE
+    if sqlCacheSize > database.MAX_SQL_CACHE_SIZE
       resetSqlCache()
     sqlCacheSize++
     sqlCache[hh] = ast
@@ -219,33 +221,60 @@ exec = (sql, props, notCritical) ->
   if error
     output.error = error
   output
-update = (table, obj, whereSql, whereProps) ->
+makeWhere = (whereObj) ->
+  sql = ''
+  props = []
+  parent = ''
+
+  parse = (obj, op, comp) ->
+    sql = ''
+    for key of obj
+      if key is '$or'
+        sql += " #{op} (#{parse(obj[key], 'OR', comp)})"
+      else if key is '$gt'
+        sql += parse obj[key], op, '>'
+      else if key is '$lt'
+        sql += parse obj[key], op, '<'
+      else if key is '$gte'
+        sql += parse obj[key], op, '>='
+      else if key is '$lte'
+        sql += parse obj[key], op, '<='
+      else if Object::toString.call(obj[key]) == '[object Object]'
+        parent += key + '->'
+        sql += parse(obj[key], op, comp)
+      else
+        sql += " #{op} #{parent}#{key} #{comp} ?"
+        props.push obj[key]
+        parent = ''
+        console.log key
+    sql
+
+  sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1')
+  {
+    sql: sql
+    props: props
+  }
+update = (table, obj, whereObj) ->
   updateSql = []
   updateProps = []
+  where = makeWhere whereObj
   for key of obj
-    if whereProps.indexOf(obj[key]) is -1
+    if where.props.indexOf(obj[key]) is -1
       updateSql.push " #{key}=? "
       updateProps.push obj[key]
-  props = updateProps.concat whereProps
-  exec "UPDATE #{table} SET #{updateSql.join(',')} WHERE #{whereSql}", props
+  props = updateProps.concat where.props
+  exec "UPDATE #{table} SET #{updateSql.join(',')} WHERE #{where.sql}", props
 insert = (table, obj) ->
   if Object.prototype.toString.call(obj) is '[object Array]'
     exec "INSERT INTO #{table} SELECT * FROM ?", [obj]
   else
     exec "INSERT INTO #{table} VALUES ?", [obj]
 module.exports =
-  config: (_config) ->
-    config = _config
-    settings.LOCAL_STORAGE = config.localStorage or config.local or settings.LOCAL_STORAGE
-    settings.PREFER_LOCAL = config.preferLocal or settings.PREFER_LOCAL
-    settings.DATABASE = config.database or config.dbname or config.databaseName or settings.DATABASE
-    settings.AUTO_ID = config.autoId or settings.AUTO_ID
-    settings.AUTO_DATE = config.autoDate or settings.AUTO_DATE
-    settings.AWS_BUCKET = config.awsBucket or settings.AWS_BUCKET
-    settings.AWS_REGION = config.awsRegion or settings.AWS_REGION
-    settings.AWS_ID = config.awsId or settings.AWS_ID
-    settings.AWS_KEY = config.awsKey or settings.AWS_KEY
-    settings.MAXSQLCACHESIZE = config.maxSqlCacheSize or settings.MAXSQLCACHESIZE
+  config: (config) ->
+    for key of config
+      keyU = underscored(humanize(key)).toUpperCase()
+      keyC = camelize(_.humanize(key)).replace(/^./, key[0].toLowerCase())
+      settings[keyU] = config[keyC] or settings[keyU]
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     storage.checkDataDir()
     @
@@ -277,12 +306,16 @@ module.exports =
       storage.put settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true
     safeCallback type, args
   exec: exec
+  select: (table, whereObj) ->
+    where = makeWhere whereObj
+    database.exec "SELECT * FROM #{table} WHERE #{where.sql}", where.props
   update: update
   insert: insert
-  upsert: (table, obj, whereSql, whereProps) ->
-    test = database.exec "SELECT * FROM #{table} WHERE #{whereSql}", whereProps
+  upsert: (table, obj, whereObj) ->
+    where = makeWhere whereObj
+    test = database.exec "SELECT * FROM #{table} WHERE #{where.sql}", where.props
     if test and test.length
-      update table, obj, whereSql, whereProps
+      update table, obj, whereObj
     else
       insert table, obj
     
