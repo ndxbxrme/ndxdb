@@ -115,7 +115,9 @@ attachDatabase = ->
     ###
   else
     maintenanceMode = false
-    safeCallback 'ready', database
+    setImmediate ->
+      console.log "ndxdb v#{version} ready"
+      safeCallback 'ready', database
 exec = (sql, props, notCritical) ->
   if maintenanceMode
     return []
@@ -246,7 +248,6 @@ makeWhere = (whereObj) ->
         sql += " #{op} #{parent}#{key} #{comp} ?"
         props.push obj[key]
         parent = ''
-        console.log key
     sql
 
   sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1')
@@ -274,7 +275,7 @@ module.exports =
     for key of config
       keyU = underscored(humanize(key)).toUpperCase()
       keyC = camelize(humanize(key)).replace(/^./, key[0].toLowerCase())
-      settings[keyU] = config[keyC] or settings[keyU]
+      settings[keyU] = config[keyC] or config[keyU] or settings[keyU]
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     storage.checkDataDir()
     @

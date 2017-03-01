@@ -3,9 +3,9 @@ db = require('../database.js')
   database: 'testdb'
   tables: ['table1', 'table2']
   autoId: '_id'
-  localStorage: './data'
 .on 'ready', ->
-  test()
+  setImmediate ->
+    test()
 .start()
 
 test = ->

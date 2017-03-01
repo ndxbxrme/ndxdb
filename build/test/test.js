@@ -4,10 +4,11 @@
   db = require('../database.js').config({
     database: 'testdb',
     tables: ['table1', 'table2'],
-    autoId: '_id',
-    localStorage: './data'
+    autoId: '_id'
   }).on('ready', function() {
-    return test();
+    return setImmediate(function() {
+      return test();
+    });
   }).start();
 
   test = function() {

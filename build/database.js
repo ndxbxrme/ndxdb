@@ -194,7 +194,10 @@
        */
     } else {
       maintenanceMode = false;
-      return safeCallback('ready', database);
+      return setImmediate(function() {
+        console.log("ndxdb v" + version + " ready");
+        return safeCallback('ready', database);
+      });
     }
   };
 
@@ -376,7 +379,6 @@
           sql += " " + op + " " + parent + key + " " + comp + " ?";
           props.push(obj[key]);
           parent = '';
-          console.log(key);
         }
       }
       return sql;
@@ -417,7 +419,7 @@
       for (key in config) {
         keyU = underscored(humanize(key)).toUpperCase();
         keyC = camelize(humanize(key)).replace(/^./, key[0].toLowerCase());
-        settings[keyU] = config[keyC] || settings[keyU];
+        settings[keyU] = config[keyC] || config[keyU] || settings[keyU];
       }
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
       storage.checkDataDir();
