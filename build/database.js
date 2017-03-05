@@ -236,17 +236,19 @@
     for (j = 0, len = ref.length; j < len; j++) {
       statement = ref[j];
       table = '';
+      isUpdate = statement instanceof alasql.yy.Update;
+      isInsert = statement instanceof alasql.yy.Insert;
+      isDelete = statement instanceof alasql.yy.Delete;
+      isSelect = statement instanceof alasql.yy.Select;
       if (statement.into) {
         table = statement.into.tableid;
+        isInsert = true;
+        isSelect = false;
       } else if (statement.table) {
         table = statement.table.tableid;
       } else if (statement.from && statement.from.lenth) {
         table = statement.from[0].tableid;
       }
-      isUpdate = statement instanceof alasql.yy.Update;
-      isInsert = statement instanceof alasql.yy.Insert;
-      isDelete = statement instanceof alasql.yy.Delete;
-      isSelect = statement instanceof alasql.yy.Select;
       if (settings.AUTO_ID && isInsert) {
         if (Object.prototype.toString.call(props[0]) === '[object Array]') {
           ref1 = props[0];

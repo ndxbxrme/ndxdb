@@ -143,13 +143,16 @@ exec = (sql, props, notCritical) ->
   error = ''
   for statement in ast.statements
     table = ''
-    if statement.into then table = statement.into.tableid
-    else if statement.table then table = statement.table.tableid
-    else if statement.from and statement.from.lenth then table = statement.from[0].tableid
     isUpdate = statement instanceof alasql.yy.Update
     isInsert = statement instanceof alasql.yy.Insert
     isDelete = statement instanceof alasql.yy.Delete
     isSelect = statement instanceof alasql.yy.Select
+    if statement.into
+      table = statement.into.tableid
+      isInsert = true
+      isSelect = false
+    else if statement.table then table = statement.table.tableid
+    else if statement.from and statement.from.lenth then table = statement.from[0].tableid
 
     if settings.AUTO_ID and isInsert
       if Object.prototype.toString.call(props[0]) is '[object Array]'
