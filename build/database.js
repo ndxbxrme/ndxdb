@@ -488,7 +488,7 @@
       }
       res = database.exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props);
       if (res && res.length) {
-        return res.c;
+        return res[0].c;
       }
       return 0;
     },

@@ -326,7 +326,7 @@ module.exports =
       where.sql = " WHERE #{where.sql}"
     res = database.exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props
     if res and res.length
-      return res.c
+      return res[0].c
     0
   update: update
   insert: insert
