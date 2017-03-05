@@ -307,9 +307,23 @@ module.exports =
       storage.put settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true
     safeCallback type, args
   exec: exec
-  select: (table, whereObj) ->
+  select: (table, whereObj, page, pageSize, sort, sortDir) ->
     where = makeWhere whereObj
-    database.exec "SELECT * FROM #{table} WHERE #{where.sql}", where.props
+    sorting = ''
+    if page or pageSize
+      start = (page - 1) * pageSize
+      sorting += " LIMIT #{page}, #{pageSize}"
+    if sort
+      sorting += " ORDER BY #{sort}"
+      if sortDir
+        sorting += " #{sortDir}"
+    database.exec "SELECT * FROM #{table} WHERE #{where.sql}#{sorting}", where.props
+  count: (table, whereObj) ->
+    where = makeWhere whereObj
+    res = database.exec "SELECT COUNT(*) AS count FROM #{table} WHERE #{where.sql}", where.props
+    if res and res.length
+      return res.count
+    0
   update: update
   insert: insert
   upsert: (table, obj, whereObj) ->

@@ -461,10 +461,30 @@
       return safeCallback(type, args);
     },
     exec: exec,
-    select: function(table, whereObj) {
-      var where;
+    select: function(table, whereObj, page, pageSize, sort, sortDir) {
+      var sorting, start, where;
       where = makeWhere(whereObj);
-      return database.exec("SELECT * FROM " + table + " WHERE " + where.sql, where.props);
+      sorting = '';
+      if (page || pageSize) {
+        start = (page - 1) * pageSize;
+        sorting += " LIMIT " + page + ", " + pageSize;
+      }
+      if (sort) {
+        sorting += " ORDER BY " + sort;
+        if (sortDir) {
+          sorting += " " + sortDir;
+        }
+      }
+      return database.exec("SELECT * FROM " + table + " WHERE " + where.sql + sorting, where.props);
+    },
+    count: function(table, whereObj) {
+      var res, where;
+      where = makeWhere(whereObj);
+      res = database.exec("SELECT COUNT(*) AS count FROM " + table + " WHERE " + where.sql, where.props);
+      if (res && res.length) {
+        return res.count;
+      }
+      return 0;
     },
     update: update,
     insert: insert,
