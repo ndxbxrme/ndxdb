@@ -153,7 +153,6 @@ exec = (sql, props, notCritical) ->
       isSelect = false
     else if statement.table then table = statement.table.tableid
     else if statement.from and statement.from.lenth then table = statement.from[0].tableid
-
     if settings.AUTO_ID and isInsert
       if Object.prototype.toString.call(props[0]) is '[object Array]'
         for prop in props[0]
@@ -276,8 +275,8 @@ insert = (table, obj) ->
 module.exports =
   config: (config) ->
     for key of config
-      keyU = underscored(humanize(key)).toUpperCase()
-      keyC = camelize(humanize(key)).replace(/^./, key[0].toLowerCase())
+      keyU = underscored(key).toUpperCase()
+      keyC = camelize(keyU.replace(/_/g, ' ')).replace(/^./, key[0].toLowerCase())
       settings[keyU] = config[keyC] or config[keyU] or settings[keyU]
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     storage.checkDataDir()
