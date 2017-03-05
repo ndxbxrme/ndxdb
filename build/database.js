@@ -480,9 +480,9 @@
     count: function(table, whereObj) {
       var res, where;
       where = makeWhere(whereObj);
-      res = database.exec("SELECT COUNT(*) AS count FROM " + table + " WHERE " + where.sql, where.props);
+      res = database.exec("SELECT COUNT(*) AS c FROM " + table + " WHERE " + where.sql, where.props);
       if (res && res.length) {
-        return res.count;
+        return res.c;
       }
       return 0;
     },
@@ -497,6 +497,9 @@
       } else {
         return insert(table, obj);
       }
+    },
+    "delete": function(table, id) {
+      return database.exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id]);
     },
     maintenanceOn: function() {
       return maintenanceMode = true;

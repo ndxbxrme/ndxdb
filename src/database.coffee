@@ -320,9 +320,9 @@ module.exports =
     database.exec "SELECT * FROM #{table} WHERE #{where.sql}#{sorting}", where.props
   count: (table, whereObj) ->
     where = makeWhere whereObj
-    res = database.exec "SELECT COUNT(*) AS count FROM #{table} WHERE #{where.sql}", where.props
+    res = database.exec "SELECT COUNT(*) AS c FROM #{table} WHERE #{where.sql}", where.props
     if res and res.length
-      return res.count
+      return res.c
     0
   update: update
   insert: insert
@@ -333,6 +333,8 @@ module.exports =
       update table, obj, whereObj
     else
       insert table, obj
+  delete: (table, id) ->
+    database.exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id]
     
   maintenanceOn: ->
     maintenanceMode = true
