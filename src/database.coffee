@@ -317,10 +317,14 @@ module.exports =
       sorting += " ORDER BY #{sort}"
       if sortDir
         sorting += " #{sortDir}"
-    database.exec "SELECT * FROM #{table} WHERE #{where.sql}#{sorting}", where.props
+    if where.sql
+      where.sql = " WHERE #{where.sql}"
+    database.exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props
   count: (table, whereObj) ->
     where = makeWhere whereObj
-    res = database.exec "SELECT COUNT(*) AS c FROM #{table} WHERE #{where.sql}", where.props
+    if where.sql
+      where.sql = " WHERE #{where.sql}"
+    res = database.exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props
     if res and res.length
       return res.c
     0

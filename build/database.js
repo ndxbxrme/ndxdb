@@ -475,12 +475,18 @@
           sorting += " " + sortDir;
         }
       }
-      return database.exec("SELECT * FROM " + table + " WHERE " + where.sql + sorting, where.props);
+      if (where.sql) {
+        where.sql = " WHERE " + where.sql;
+      }
+      return database.exec("SELECT * FROM " + table + where.sql + sorting, where.props);
     },
     count: function(table, whereObj) {
       var res, where;
       where = makeWhere(whereObj);
-      res = database.exec("SELECT COUNT(*) AS c FROM " + table + " WHERE " + where.sql, where.props);
+      if (where.sql) {
+        where.sql = " WHERE " + where.sql;
+      }
+      res = database.exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props);
       if (res && res.length) {
         return res.c;
       }
