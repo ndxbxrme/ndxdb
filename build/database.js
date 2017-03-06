@@ -397,6 +397,9 @@
     updateSql = [];
     updateProps = [];
     where = makeWhere(whereObj);
+    if (where.sql) {
+      where.sql = " WHERE " + where.sql;
+    }
     for (key in obj) {
       if (where.props.indexOf(obj[key]) === -1) {
         updateSql.push(" " + key + "=? ");
@@ -404,7 +407,7 @@
       }
     }
     props = updateProps.concat(where.props);
-    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + " WHERE " + where.sql, props);
+    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props);
   };
 
   insert = function(table, obj) {
@@ -467,20 +470,22 @@
       var sorting, start, where;
       where = makeWhere(whereObj);
       sorting = '';
-      if (page || pageSize) {
-        start = (page - 1) * pageSize;
-        sorting += " LIMIT " + page + ", " + pageSize;
-      }
       if (sort) {
         sorting += " ORDER BY " + sort;
         if (sortDir) {
           sorting += " " + sortDir;
         }
       }
+      if (page || pageSize) {
+        page = page || 1;
+        pageSize = pageSize || 10;
+        start = ((page - 1) * pageSize) + 1;
+        sorting += " LIMIT " + pageSize + " OFFSET " + start;
+      }
       if (where.sql) {
         where.sql = " WHERE " + where.sql;
       }
-      return database.exec("SELECT * FROM " + table + where.sql + sorting, where.props);
+      return exec("SELECT * FROM " + table + where.sql + sorting, where.props);
     },
     count: function(table, whereObj) {
       var res, where;
@@ -488,7 +493,7 @@
       if (where.sql) {
         where.sql = " WHERE " + where.sql;
       }
-      res = database.exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props);
+      res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props);
       if (res && res.length) {
         return res[0].c;
       }
@@ -499,7 +504,10 @@
     upsert: function(table, obj, whereObj) {
       var test, where;
       where = makeWhere(whereObj);
-      test = database.exec("SELECT * FROM " + table + " WHERE " + where.sql, where.props);
+      if (where.sql) {
+        where.sql = " WHERE " + where.sql;
+      }
+      test = exec("SELECT * FROM " + table + where.sql, where.props);
       if (test && test.length) {
         return update(table, obj, whereObj);
       } else {
@@ -507,7 +515,7 @@
       }
     },
     "delete": function(table, id) {
-      return database.exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id]);
+      return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id]);
     },
     maintenanceOn: function() {
       return maintenanceMode = true;

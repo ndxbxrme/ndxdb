@@ -261,12 +261,14 @@ update = (table, obj, whereObj) ->
   updateSql = []
   updateProps = []
   where = makeWhere whereObj
+  if where.sql
+    where.sql = " WHERE #{where.sql}"
   for key of obj
     if where.props.indexOf(obj[key]) is -1
       updateSql.push " #{key}=? "
       updateProps.push obj[key]
   props = updateProps.concat where.props
-  exec "UPDATE #{table} SET #{updateSql.join(',')} WHERE #{where.sql}", props
+  exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props
 insert = (table, obj) ->
   if Object.prototype.toString.call(obj) is '[object Array]'
     exec "INSERT INTO #{table} SELECT * FROM ?", [obj]
@@ -312,21 +314,23 @@ module.exports =
   select: (table, whereObj, page, pageSize, sort, sortDir) ->
     where = makeWhere whereObj
     sorting = ''
-    if page or pageSize
-      start = (page - 1) * pageSize
-      sorting += " LIMIT #{page}, #{pageSize}"
     if sort
       sorting += " ORDER BY #{sort}"
       if sortDir
         sorting += " #{sortDir}"
+    if page or pageSize
+      page = page or 1
+      pageSize = pageSize or 10
+      start = ((page - 1) * pageSize) + 1
+      sorting += " LIMIT #{pageSize} OFFSET #{start}"
     if where.sql
       where.sql = " WHERE #{where.sql}"
-    database.exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props
+    exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props
   count: (table, whereObj) ->
     where = makeWhere whereObj
     if where.sql
       where.sql = " WHERE #{where.sql}"
-    res = database.exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props
+    res = exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props
     if res and res.length
       return res[0].c
     0
@@ -334,13 +338,15 @@ module.exports =
   insert: insert
   upsert: (table, obj, whereObj) ->
     where = makeWhere whereObj
-    test = database.exec "SELECT * FROM #{table} WHERE #{where.sql}", where.props
+    if where.sql
+      where.sql = " WHERE #{where.sql}"
+    test = exec "SELECT * FROM #{table}#{where.sql}", where.props
     if test and test.length
       update table, obj, whereObj
     else
       insert table, obj
   delete: (table, id) ->
-    database.exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id]
+    exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id]
     
   maintenanceOn: ->
     maintenanceMode = true
