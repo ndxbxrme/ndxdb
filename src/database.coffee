@@ -118,7 +118,7 @@ attachDatabase = ->
     setImmediate ->
       console.log "ndxdb v#{version} ready"
       safeCallback 'ready', database
-exec = (sql, props, notCritical) ->
+exec = (sql, props, notCritical, cb) ->
   if maintenanceMode
     return []
   hash = (str) ->
@@ -205,7 +205,7 @@ exec = (sql, props, notCritical) ->
           table: table
           obj: props[0]
           args: args
-  output = database.exec sql, props    
+  output = database.exec sql, props, cb   
   if updateIds and updateIds.length
     async.each updateIds, (updateId, callback) ->
       if settings.AUTO_DATE
@@ -260,7 +260,7 @@ makeWhere = (whereObj) ->
     sql: sql
     props: props
   }
-update = (table, obj, whereObj) ->
+update = (table, obj, whereObj, cb) ->
   updateSql = []
   updateProps = []
   where = makeWhere whereObj
@@ -271,12 +271,12 @@ update = (table, obj, whereObj) ->
       updateSql.push " #{key}=? "
       updateProps.push obj[key]
   props = updateProps.concat where.props
-  exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props
-insert = (table, obj) ->
+  exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, cb
+insert = (table, obj, cb) ->
   if Object.prototype.toString.call(obj) is '[object Array]'
-    exec "INSERT INTO #{table} SELECT * FROM ?", [obj]
+    exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, cb
   else
-    exec "INSERT INTO #{table} VALUES ?", [obj]
+    exec "INSERT INTO #{table} VALUES ?", [obj], null, cb
 module.exports =
   config: (config) ->
     for key of config
@@ -314,42 +314,43 @@ module.exports =
       storage.put settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true
     safeCallback type, args
   exec: exec
-  select: (table, whereObj, page, pageSize, sort, sortDir) ->
-    where = makeWhere whereObj
+  select: (table, args, cb) ->
+    args = args or {}
+    where = makeWhere args.where
     sorting = ''
-    if sort
-      sorting += " ORDER BY #{sort}"
-      if sortDir
-        sorting += " #{sortDir}"
-    if page or pageSize
-      page = page or 1
-      pageSize = pageSize or 10
-      start = ((page - 1) * pageSize) + 1
-      sorting += " LIMIT #{pageSize} OFFSET #{start}"
+    if args.sort
+      sorting += " ORDER BY #{args.sort}"
+      if args.sortDir
+        sorting += " #{args.sortDir}"
+    if args.page or args.pageSize
+      args.page = args.page or 1
+      args.pageSize = args.pageSize or 10
+      start = ((args.page - 1) * args.pageSize) + 1
+      sorting += " LIMIT #{args.pageSize} OFFSET #{start}"
     if where.sql
       where.sql = " WHERE #{where.sql}"
-    exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props
-  count: (table, whereObj) ->
+    exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, cb
+  count: (table, whereObj, cb) ->
     where = makeWhere whereObj
     if where.sql
       where.sql = " WHERE #{where.sql}"
-    res = exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props
+    res = exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props, null, cb
     if res and res.length
       return res[0].c
     0
   update: update
   insert: insert
-  upsert: (table, obj, whereObj) ->
+  upsert: (table, obj, whereObj, cb) ->
     where = makeWhere whereObj
     if where.sql
       where.sql = " WHERE #{where.sql}"
     test = exec "SELECT * FROM #{table}#{where.sql}", where.props
     if test and test.length
-      update table, obj, whereObj
+      update table, obj, whereObj, cb
     else
-      insert table, obj
-  delete: (table, id) ->
-    exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id]
+      insert table, obj, cb
+  delete: (table, id, cb) ->
+    exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, cb
     
   maintenanceOn: ->
     maintenanceMode = true

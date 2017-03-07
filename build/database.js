@@ -201,7 +201,7 @@
     }
   };
 
-  exec = function(sql, props, notCritical) {
+  exec = function(sql, props, notCritical, cb) {
     var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
     if (maintenanceMode) {
       return [];
@@ -325,7 +325,7 @@
         }
       }
     }
-    output = database.exec(sql, props);
+    output = database.exec(sql, props, cb);
     if (updateIds && updateIds.length) {
       async.each(updateIds, function(updateId, callback) {
         var r;
@@ -395,7 +395,7 @@
     };
   };
 
-  update = function(table, obj, whereObj) {
+  update = function(table, obj, whereObj, cb) {
     var key, props, updateProps, updateSql, where;
     updateSql = [];
     updateProps = [];
@@ -410,14 +410,14 @@
       }
     }
     props = updateProps.concat(where.props);
-    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props);
+    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, cb);
   };
 
-  insert = function(table, obj) {
+  insert = function(table, obj, cb) {
     if (Object.prototype.toString.call(obj) === '[object Array]') {
-      return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj]);
+      return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, cb);
     } else {
-      return exec("INSERT INTO " + table + " VALUES ?", [obj]);
+      return exec("INSERT INTO " + table + " VALUES ?", [obj], null, cb);
     }
   };
 
@@ -469,34 +469,35 @@
       return safeCallback(type, args);
     },
     exec: exec,
-    select: function(table, whereObj, page, pageSize, sort, sortDir) {
+    select: function(table, args, cb) {
       var sorting, start, where;
-      where = makeWhere(whereObj);
+      args = args || {};
+      where = makeWhere(args.where);
       sorting = '';
-      if (sort) {
-        sorting += " ORDER BY " + sort;
-        if (sortDir) {
-          sorting += " " + sortDir;
+      if (args.sort) {
+        sorting += " ORDER BY " + args.sort;
+        if (args.sortDir) {
+          sorting += " " + args.sortDir;
         }
       }
-      if (page || pageSize) {
-        page = page || 1;
-        pageSize = pageSize || 10;
-        start = ((page - 1) * pageSize) + 1;
-        sorting += " LIMIT " + pageSize + " OFFSET " + start;
+      if (args.page || args.pageSize) {
+        args.page = args.page || 1;
+        args.pageSize = args.pageSize || 10;
+        start = ((args.page - 1) * args.pageSize) + 1;
+        sorting += " LIMIT " + args.pageSize + " OFFSET " + start;
       }
       if (where.sql) {
         where.sql = " WHERE " + where.sql;
       }
-      return exec("SELECT * FROM " + table + where.sql + sorting, where.props);
+      return exec("SELECT * FROM " + table + where.sql + sorting, where.props, cb);
     },
-    count: function(table, whereObj) {
+    count: function(table, whereObj, cb) {
       var res, where;
       where = makeWhere(whereObj);
       if (where.sql) {
         where.sql = " WHERE " + where.sql;
       }
-      res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props);
+      res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props, null, cb);
       if (res && res.length) {
         return res[0].c;
       }
@@ -504,7 +505,7 @@
     },
     update: update,
     insert: insert,
-    upsert: function(table, obj, whereObj) {
+    upsert: function(table, obj, whereObj, cb) {
       var test, where;
       where = makeWhere(whereObj);
       if (where.sql) {
@@ -512,13 +513,13 @@
       }
       test = exec("SELECT * FROM " + table + where.sql, where.props);
       if (test && test.length) {
-        return update(table, obj, whereObj);
+        return update(table, obj, whereObj, cb);
       } else {
-        return insert(table, obj);
+        return insert(table, obj, cb);
       }
     },
-    "delete": function(table, id) {
-      return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id]);
+    "delete": function(table, id, cb) {
+      return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, cb);
     },
     maintenanceOn: function() {
       return maintenanceMode = true;
