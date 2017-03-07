@@ -489,7 +489,7 @@
       if (where.sql) {
         where.sql = " WHERE " + where.sql;
       }
-      return exec("SELECT * FROM " + table + where.sql + sorting, where.props, cb);
+      return exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, cb);
     },
     count: function(table, whereObj, cb) {
       var res, where;

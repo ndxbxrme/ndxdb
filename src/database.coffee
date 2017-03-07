@@ -329,7 +329,7 @@ module.exports =
       sorting += " LIMIT #{args.pageSize} OFFSET #{start}"
     if where.sql
       where.sql = " WHERE #{where.sql}"
-    exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, cb
+    exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null,  cb
   count: (table, whereObj, cb) ->
     where = makeWhere whereObj
     if where.sql
