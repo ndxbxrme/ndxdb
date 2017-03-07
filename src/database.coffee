@@ -234,7 +234,7 @@ makeWhere = (whereObj) ->
     sql = ''
     for key of obj
       if key is '$or'
-        sql += " #{op} (#{parse(obj[key], 'OR', comp)})"
+        sql += " #{op} (#{parse(obj[key], 'OR', comp)})".replace /\( OR /g, '('
       else if key is '$gt'
         sql += parse obj[key], op, '>'
       else if key is '$lt'
@@ -243,6 +243,9 @@ makeWhere = (whereObj) ->
         sql += parse obj[key], op, '>='
       else if key is '$lte'
         sql += parse obj[key], op, '<='
+      else if key is '$like'
+        sql += " #{op} #{parent.replace('->', '')} LIKE '%#{obj[key]}%'"
+        parent = ''
       else if Object::toString.call(obj[key]) == '[object Object]'
         parent += key + '->'
         sql += parse(obj[key], op, comp)

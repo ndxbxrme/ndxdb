@@ -365,7 +365,7 @@
       sql = '';
       for (key in obj) {
         if (key === '$or') {
-          sql += " " + op + " (" + (parse(obj[key], 'OR', comp)) + ")";
+          sql += (" " + op + " (" + (parse(obj[key], 'OR', comp)) + ")").replace(/\( OR /g, '(');
         } else if (key === '$gt') {
           sql += parse(obj[key], op, '>');
         } else if (key === '$lt') {
@@ -374,6 +374,9 @@
           sql += parse(obj[key], op, '>=');
         } else if (key === '$lte') {
           sql += parse(obj[key], op, '<=');
+        } else if (key === '$like') {
+          sql += " " + op + " " + (parent.replace('->', '')) + " LIKE '%" + obj[key] + "%'";
+          parent = '';
         } else if (Object.prototype.toString.call(obj[key]) === '[object Object]') {
           parent += key + '->';
           sql += parse(obj[key], op, comp);
