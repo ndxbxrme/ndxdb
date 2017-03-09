@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, permissions, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, underscored, update, upsert, version;
+  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, underscored, update, upsert, version;
 
   fs = require('fs');
 
@@ -13,8 +13,6 @@
   ObjectID = require('bson-objectid');
 
   objtrans = require('objtrans');
-
-  permissions = require('ndx-permissions')();
 
   settings = require('./settings');
 
@@ -211,7 +209,7 @@
     }
   };
 
-  exec = function(sql, props, notCritical, cb) {
+  exec = function(sql, props, notCritical, isServer, cb) {
     var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
     if (maintenanceMode) {
       if (typeof cb === "function") {
@@ -305,13 +303,15 @@
             safeCallback('preDelete', {
               id: getId(r),
               table: table,
-              obj: delObj
+              obj: delObj,
+              isServer: isServer
             });
             storage.put(settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical);
             safeCallback('delete', {
               id: getId(r),
               table: table,
-              obj: delObj
+              obj: delObj,
+              isServer: isServer
             });
             return callback();
           });
@@ -328,14 +328,16 @@
               id: getId(prop),
               table: table,
               obj: prop,
-              args: args
+              args: args,
+              isServer: isServer
             });
             storage.put(settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical);
             safeCallback('insert', {
               id: getId(prop),
               table: table,
               obj: prop,
-              args: args
+              args: args,
+              isServer: isServer
             });
           }
         } else {
@@ -346,14 +348,16 @@
             id: getId(props[0]),
             table: table,
             obj: props[0],
-            args: args
+            args: args,
+            isServer: isServer
           });
           storage.put(settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical);
           safeCallback('insert', {
             id: getId(props[0]),
             table: table,
             obj: props[0],
-            args: args
+            args: args,
+            isServer: isServer
           });
         }
       }
@@ -372,14 +376,16 @@
             id: getId(r),
             table: updateId.ndxtable,
             obj: r,
-            args: args
+            args: args,
+            isServer: isServer
           });
           storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
           safeCallback('update', {
             id: getId(r),
             table: updateId.ndxtable,
             obj: r,
-            args: args
+            args: args,
+            isServer: isServer
           });
         }
         return callback();
@@ -435,10 +441,11 @@
   };
 
   select = function(table, args, cb, isServer) {
-    var item, j, len, myCb, output, sorting, start, transformer, where;
-    if (permissions && !isServer) {
-      permissions.check('select', table);
-    }
+    var myCb, output, sorting, start, where;
+    safeCallback('preSelect', {
+      table: table,
+      isServer: isServer
+    });
     args = args || {};
     where = makeWhere(args.where);
     sorting = '';
@@ -460,28 +467,24 @@
     myCb = null;
     if (cb) {
       myCb = function(output) {
-        var item, j, len, transformer;
-        if (output && output.length && permissions && !isServer) {
-          if (transformer = permissions.getTransformer('select', table)) {
-            for (j = 0, len = output.length; j < len; j++) {
-              item = output[j];
-              item = objtrans(item, transformer);
-            }
-          }
+        if (output && output.length) {
+          safeCallback('select', {
+            table: table,
+            objs: output,
+            isServer: isServer
+          });
         }
         return cb(output);
       };
     }
-    output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, cb);
-    if (output && output.length && permissions && !isServer) {
-      if (transformer = permissions.getTransformer('select', table)) {
-        for (j = 0, len = output.length; j < len; j++) {
-          item = output[j];
-          item = objtrans(item, transformer);
-        }
-      }
+    output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, cb);
+    if (output && output.length) {
+      return safeCallback('select', {
+        table: table,
+        objs: output,
+        isServer: isServer
+      });
     }
-    return output;
   };
 
   count = function(table, whereObj, cb) {
@@ -490,7 +493,7 @@
     if (where.sql) {
       where.sql = " WHERE " + where.sql;
     }
-    res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props, null, cb);
+    res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props, null, isServer, cb);
     if (res && res.length) {
       return res[0].c;
     }
@@ -498,13 +501,7 @@
   };
 
   update = function(table, obj, whereObj, cb, isServer) {
-    var key, props, transformer, updateProps, updateSql, where;
-    if (permissions && !isServer) {
-      permissions.check('update', table);
-      if (transformer = permissions.getTransformer('update', table)) {
-        obj = objtrans(obj, transformer);
-      }
-    }
+    var key, props, updateProps, updateSql, where;
     updateSql = [];
     updateProps = [];
     where = makeWhere(whereObj);
@@ -518,21 +515,14 @@
       }
     }
     props = updateProps.concat(where.props);
-    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, cb);
+    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, isServer, cb);
   };
 
   insert = function(table, obj, cb, isServer) {
-    var transformer;
-    if (permissions && !isServer) {
-      permissions.check('insert', table);
-      if (transformer = permissions.getTransformer('insert', table)) {
-        obj = objtrans(obj, transformer);
-      }
-    }
     if (Object.prototype.toString.call(obj) === '[object Array]') {
-      return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, cb);
+      return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
     } else {
-      return exec("INSERT INTO " + table + " VALUES ?", [obj], null, cb);
+      return exec("INSERT INTO " + table + " VALUES ?", [obj], null, isServer, cb);
     }
   };
 
@@ -542,7 +532,7 @@
     if (where.sql) {
       where.sql = " WHERE " + where.sql;
     }
-    test = exec("SELECT * FROM " + table + where.sql, where.props);
+    test = exec("SELECT * FROM " + table + where.sql, where.props, null, isServer);
     if (test && test.length) {
       return update(table, obj, whereObj, cb, isServer);
     } else {
@@ -551,10 +541,7 @@
   };
 
   del = function(table, id, cb, isServer) {
-    if (permissions && !isServer) {
-      permissions.check('delete', table);
-    }
-    return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, cb);
+    return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, isServer, cb);
   };
 
   module.exports = {
@@ -656,13 +643,7 @@
     resetSqlCache: function() {
       return database.resetSqlCache();
     },
-    alasql: alasql,
-    setNdx: function(_ndx) {
-      ndx = _ndx;
-      permissions.setAuthenticate(ndx.authenticate);
-      return this;
-    },
-    setPermissions: permissions.setPermissions
+    alasql: alasql
   };
 
 }).call(this);
