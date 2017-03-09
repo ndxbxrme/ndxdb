@@ -365,6 +365,8 @@ upsert = (table, obj, whereObj, cb, isServer) ->
     insert table, obj, cb, isServer
 del = (table, id, cb, isServer) ->
   exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, isServer, cb
+  
+
 module.exports =
   config: (config) ->
     for key of config
@@ -372,6 +374,7 @@ module.exports =
       keyC = camelize(keyU.replace(/_/g, ' ')).replace(/^./, key[0].toLowerCase())
       settings[keyU] = config[keyC] or config[keyU] or settings[keyU]
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
+    settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE or 100
     storage.checkDataDir()
     @
   start: ->

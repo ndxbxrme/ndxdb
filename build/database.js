@@ -553,6 +553,7 @@
         settings[keyU] = config[keyC] || config[keyU] || settings[keyU];
       }
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
+      settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE || 100;
       storage.checkDataDir();
       return this;
     },
