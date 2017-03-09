@@ -27,6 +27,10 @@ callbacks =
   update: []
   select: []
   delete: []
+  preInsert: []
+  preUpdate: []
+  preSelect: []
+  preDelete: []
   restore: []
 restoreDatabase = (data, cb) ->
   for key of data
@@ -184,6 +188,10 @@ exec = (sql, props, notCritical, cb) ->
           delObj =
             '__!deleteMe!': true
           delObj[getIdField(r)] = getId r
+          safeCallback 'preDelete', 
+            id: getId r
+            table: table
+            obj: delObj
           storage.put settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical
           safeCallback 'delete', 
             id: getId r
@@ -195,6 +203,11 @@ exec = (sql, props, notCritical, cb) ->
         for prop in props[0]
           if settings.AUTO_DATE
             prop.u = new Date().valueOf()
+          safeCallback 'preInsert', 
+            id: getId prop
+            table: table
+            obj: prop
+            args: args
           storage.put settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical
           safeCallback 'insert', 
             id: getId prop
@@ -204,6 +217,11 @@ exec = (sql, props, notCritical, cb) ->
       else
         if settings.AUTO_DATE
           props[0].u = new Date().valueOf();
+        safeCallback 'preInsert',
+          id: getId props[0]
+          table: table
+          obj: props[0]
+          args: args
         storage.put settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical
         safeCallback 'insert',
           id: getId props[0]
@@ -218,6 +236,11 @@ exec = (sql, props, notCritical, cb) ->
       res = database.exec 'SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]
       if res and res.length
         r = res[0]
+        safeCallback 'preUpdate',
+          id: getId r
+          table: updateId.ndxtable
+          obj: r
+          args: args
         storage.put settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical
         safeCallback 'update',
           id: getId r
