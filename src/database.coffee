@@ -5,6 +5,8 @@ alasql = require 'alasql'
 require('./alasql-patch') alasql
 async = require 'async'
 ObjectID = require 'bson-objectid'
+objtrans = require 'objtrans'
+permissions = require('ndx-permissions')()
 settings = require './settings'
 storage = require('./storage')()
 underscored = require('underscore.string').underscored
@@ -12,6 +14,7 @@ humanize = require('underscore.string').humanize
 camelize = require('underscore.string').camelize
 version = require('../package.json').version
 database = null
+ndx = {}
 sqlCache = {}
 sqlCacheSize = 0
 resetSqlCache = ->
@@ -120,6 +123,7 @@ attachDatabase = ->
       safeCallback 'ready', database
 exec = (sql, props, notCritical, cb) ->
   if maintenanceMode
+    cb? []
     return []
   hash = (str) ->
     h = 5381
@@ -132,6 +136,7 @@ exec = (sql, props, notCritical, cb) ->
   if not ast
     ast = alasql.parse sql
   if not (ast.statements and ast.statements.length)
+    cb? []
     return []
   else
     if sqlCacheSize > database.MAX_SQL_CACHE_SIZE
@@ -260,7 +265,50 @@ makeWhere = (whereObj) ->
     sql: sql
     props: props
   }
-update = (table, obj, whereObj, cb) ->
+select = (table, args, cb, isServer) ->
+  if permissions and not isServer
+    permissions.check 'select', table
+  args = args or {}
+  where = makeWhere args.where
+  sorting = ''
+  if args.sort
+    sorting += " ORDER BY #{args.sort}"
+    if args.sortDir
+      sorting += " #{args.sortDir}"
+  if args.page or args.pageSize
+    args.page = args.page or 1
+    args.pageSize = args.pageSize or 10
+    start = ((args.page - 1) * args.pageSize) + 1
+    sorting += " LIMIT #{args.pageSize} OFFSET #{start}"
+  if where.sql
+    where.sql = " WHERE #{where.sql}"
+  myCb = null
+  if cb
+    myCb = (output) ->
+      if output and output.length and permissions and not isServer
+        if transformer = permissions.getTransformer 'select', table
+          for item in output
+            item = objtrans item, transformer
+      cb output
+  output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null,  cb
+  if output and output.length and permissions and not isServer
+    if transformer = permissions.getTransformer 'select', table
+      for item in output
+        item = objtrans item, transformer
+  output
+count = (table, whereObj, cb) ->
+  where = makeWhere whereObj
+  if where.sql
+    where.sql = " WHERE #{where.sql}"
+  res = exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props, null, cb
+  if res and res.length
+    return res[0].c
+  0
+update = (table, obj, whereObj, cb, isServer) ->
+  if permissions and not isServer
+    permissions.check 'update', table
+    if transformer = permissions.getTransformer 'update', table
+      obj = objtrans obj, transformer
   updateSql = []
   updateProps = []
   where = makeWhere whereObj
@@ -272,11 +320,28 @@ update = (table, obj, whereObj, cb) ->
       updateProps.push obj[key]
   props = updateProps.concat where.props
   exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, cb
-insert = (table, obj, cb) ->
+insert = (table, obj, cb, isServer) ->
+  if permissions and not isServer
+    permissions.check 'insert', table
+    if transformer = permissions.getTransformer 'insert', table
+      obj = objtrans obj, transformer
   if Object.prototype.toString.call(obj) is '[object Array]'
     exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, cb
   else
     exec "INSERT INTO #{table} VALUES ?", [obj], null, cb
+upsert = (table, obj, whereObj, cb, isServer) ->
+  where = makeWhere whereObj
+  if where.sql
+    where.sql = " WHERE #{where.sql}"
+  test = exec "SELECT * FROM #{table}#{where.sql}", where.props
+  if test and test.length
+    update table, obj, whereObj, cb, isServer
+  else
+    insert table, obj, cb, isServer
+del = (table, id, cb, isServer) ->
+  if permissions and not isServer
+    permissions.check 'delete', table
+  exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, cb
 module.exports =
   config: (config) ->
     for key of config
@@ -314,43 +379,12 @@ module.exports =
       storage.put settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true
     safeCallback type, args
   exec: exec
-  select: (table, args, cb) ->
-    args = args or {}
-    where = makeWhere args.where
-    sorting = ''
-    if args.sort
-      sorting += " ORDER BY #{args.sort}"
-      if args.sortDir
-        sorting += " #{args.sortDir}"
-    if args.page or args.pageSize
-      args.page = args.page or 1
-      args.pageSize = args.pageSize or 10
-      start = ((args.page - 1) * args.pageSize) + 1
-      sorting += " LIMIT #{args.pageSize} OFFSET #{start}"
-    if where.sql
-      where.sql = " WHERE #{where.sql}"
-    exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null,  cb
-  count: (table, whereObj, cb) ->
-    where = makeWhere whereObj
-    if where.sql
-      where.sql = " WHERE #{where.sql}"
-    res = exec "SELECT COUNT(*) AS c FROM #{table}#{where.sql}", where.props, null, cb
-    if res and res.length
-      return res[0].c
-    0
+  select: select
+  count: count
   update: update
   insert: insert
-  upsert: (table, obj, whereObj, cb) ->
-    where = makeWhere whereObj
-    if where.sql
-      where.sql = " WHERE #{where.sql}"
-    test = exec "SELECT * FROM #{table}#{where.sql}", where.props
-    if test and test.length
-      update table, obj, whereObj, cb
-    else
-      insert table, obj, cb
-  delete: (table, id, cb) ->
-    exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, cb
+  upsert: upsert
+  delete: del
     
   maintenanceOn: ->
     maintenanceMode = true
@@ -381,3 +415,8 @@ module.exports =
   resetSqlCache: ->
     database.resetSqlCache()
   alasql: alasql
+  setNdx: (_ndx) ->
+    ndx = _ndx
+    permissions.setAuthenticate ndx.authenticate
+    @
+  setPermissions: permissions.setPermissions

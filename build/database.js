@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, database, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, settings, sqlCache, sqlCacheSize, storage, underscored, update, version;
+  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, permissions, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, underscored, update, upsert, version;
 
   fs = require('fs');
 
@@ -11,6 +11,10 @@
   async = require('async');
 
   ObjectID = require('bson-objectid');
+
+  objtrans = require('objtrans');
+
+  permissions = require('ndx-permissions')();
 
   settings = require('./settings');
 
@@ -25,6 +29,8 @@
   version = require('../package.json').version;
 
   database = null;
+
+  ndx = {};
 
   sqlCache = {};
 
@@ -204,6 +210,9 @@
   exec = function(sql, props, notCritical, cb) {
     var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
     if (maintenanceMode) {
+      if (typeof cb === "function") {
+        cb([]);
+      }
       return [];
     }
     hash = function(str) {
@@ -221,6 +230,9 @@
       ast = alasql.parse(sql);
     }
     if (!(ast.statements && ast.statements.length)) {
+      if (typeof cb === "function") {
+        cb([]);
+      }
       return [];
     } else {
       if (sqlCacheSize > database.MAX_SQL_CACHE_SIZE) {
@@ -395,8 +407,77 @@
     };
   };
 
-  update = function(table, obj, whereObj, cb) {
-    var key, props, updateProps, updateSql, where;
+  select = function(table, args, cb, isServer) {
+    var item, j, len, myCb, output, sorting, start, transformer, where;
+    if (permissions && !isServer) {
+      permissions.check('select', table);
+    }
+    args = args || {};
+    where = makeWhere(args.where);
+    sorting = '';
+    if (args.sort) {
+      sorting += " ORDER BY " + args.sort;
+      if (args.sortDir) {
+        sorting += " " + args.sortDir;
+      }
+    }
+    if (args.page || args.pageSize) {
+      args.page = args.page || 1;
+      args.pageSize = args.pageSize || 10;
+      start = ((args.page - 1) * args.pageSize) + 1;
+      sorting += " LIMIT " + args.pageSize + " OFFSET " + start;
+    }
+    if (where.sql) {
+      where.sql = " WHERE " + where.sql;
+    }
+    myCb = null;
+    if (cb) {
+      myCb = function(output) {
+        var item, j, len, transformer;
+        if (output && output.length && permissions && !isServer) {
+          if (transformer = permissions.getTransformer('select', table)) {
+            for (j = 0, len = output.length; j < len; j++) {
+              item = output[j];
+              item = objtrans(item, transformer);
+            }
+          }
+        }
+        return cb(output);
+      };
+    }
+    output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, cb);
+    if (output && output.length && permissions && !isServer) {
+      if (transformer = permissions.getTransformer('select', table)) {
+        for (j = 0, len = output.length; j < len; j++) {
+          item = output[j];
+          item = objtrans(item, transformer);
+        }
+      }
+    }
+    return output;
+  };
+
+  count = function(table, whereObj, cb) {
+    var res, where;
+    where = makeWhere(whereObj);
+    if (where.sql) {
+      where.sql = " WHERE " + where.sql;
+    }
+    res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props, null, cb);
+    if (res && res.length) {
+      return res[0].c;
+    }
+    return 0;
+  };
+
+  update = function(table, obj, whereObj, cb, isServer) {
+    var key, props, transformer, updateProps, updateSql, where;
+    if (permissions && !isServer) {
+      permissions.check('update', table);
+      if (transformer = permissions.getTransformer('update', table)) {
+        obj = objtrans(obj, transformer);
+      }
+    }
     updateSql = [];
     updateProps = [];
     where = makeWhere(whereObj);
@@ -413,12 +494,40 @@
     return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, cb);
   };
 
-  insert = function(table, obj, cb) {
+  insert = function(table, obj, cb, isServer) {
+    var transformer;
+    if (permissions && !isServer) {
+      permissions.check('insert', table);
+      if (transformer = permissions.getTransformer('insert', table)) {
+        obj = objtrans(obj, transformer);
+      }
+    }
     if (Object.prototype.toString.call(obj) === '[object Array]') {
       return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, cb);
     } else {
       return exec("INSERT INTO " + table + " VALUES ?", [obj], null, cb);
     }
+  };
+
+  upsert = function(table, obj, whereObj, cb, isServer) {
+    var test, where;
+    where = makeWhere(whereObj);
+    if (where.sql) {
+      where.sql = " WHERE " + where.sql;
+    }
+    test = exec("SELECT * FROM " + table + where.sql, where.props);
+    if (test && test.length) {
+      return update(table, obj, whereObj, cb, isServer);
+    } else {
+      return insert(table, obj, cb, isServer);
+    }
+  };
+
+  del = function(table, id, cb, isServer) {
+    if (permissions && !isServer) {
+      permissions.check('delete', table);
+    }
+    return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, cb);
   };
 
   module.exports = {
@@ -469,58 +578,12 @@
       return safeCallback(type, args);
     },
     exec: exec,
-    select: function(table, args, cb) {
-      var sorting, start, where;
-      args = args || {};
-      where = makeWhere(args.where);
-      sorting = '';
-      if (args.sort) {
-        sorting += " ORDER BY " + args.sort;
-        if (args.sortDir) {
-          sorting += " " + args.sortDir;
-        }
-      }
-      if (args.page || args.pageSize) {
-        args.page = args.page || 1;
-        args.pageSize = args.pageSize || 10;
-        start = ((args.page - 1) * args.pageSize) + 1;
-        sorting += " LIMIT " + args.pageSize + " OFFSET " + start;
-      }
-      if (where.sql) {
-        where.sql = " WHERE " + where.sql;
-      }
-      return exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, cb);
-    },
-    count: function(table, whereObj, cb) {
-      var res, where;
-      where = makeWhere(whereObj);
-      if (where.sql) {
-        where.sql = " WHERE " + where.sql;
-      }
-      res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props, null, cb);
-      if (res && res.length) {
-        return res[0].c;
-      }
-      return 0;
-    },
+    select: select,
+    count: count,
     update: update,
     insert: insert,
-    upsert: function(table, obj, whereObj, cb) {
-      var test, where;
-      where = makeWhere(whereObj);
-      if (where.sql) {
-        where.sql = " WHERE " + where.sql;
-      }
-      test = exec("SELECT * FROM " + table + where.sql, where.props);
-      if (test && test.length) {
-        return update(table, obj, whereObj, cb);
-      } else {
-        return insert(table, obj, cb);
-      }
-    },
-    "delete": function(table, id, cb) {
-      return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, cb);
-    },
+    upsert: upsert,
+    "delete": del,
     maintenanceOn: function() {
       return maintenanceMode = true;
     },
@@ -566,7 +629,13 @@
     resetSqlCache: function() {
       return database.resetSqlCache();
     },
-    alasql: alasql
+    alasql: alasql,
+    setNdx: function(_ndx) {
+      ndx = _ndx;
+      permissions.setAuthenticate(ndx.authenticate);
+      return this;
+    },
+    setPermissions: permissions.setPermissions
   };
 
 }).call(this);
