@@ -330,7 +330,7 @@ select = (table, args, cb, isServer) ->
       objs: output
       isServer: isServer
 
-count = (table, whereObj, cb) ->
+count = (table, whereObj, cb, isServer) ->
   where = makeWhere whereObj
   if where.sql
     where.sql = " WHERE #{where.sql}"

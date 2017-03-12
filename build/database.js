@@ -489,7 +489,7 @@
     }
   };
 
-  count = function(table, whereObj, cb) {
+  count = function(table, whereObj, cb, isServer) {
     var res, where;
     where = makeWhere(whereObj);
     if (where.sql) {
