@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, underscored, update, upsert, version;
+  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, underscored, update, upsert, version;
 
   fs = require('fs');
 
@@ -392,7 +392,9 @@
       });
     }
     if (isSelect) {
-      safeCallback('select', null);
+      safeCallback('select', {
+        isServer: isServer
+      });
     }
     if (error) {
       output.error = error;
@@ -500,8 +502,18 @@
     return 0;
   };
 
+  cleanObj = function(obj) {
+    var key;
+    for (key in obj) {
+      if (key.indexOf('$') === 0) {
+        delete obj[key];
+      }
+    }
+  };
+
   update = function(table, obj, whereObj, cb, isServer) {
     var key, props, updateProps, updateSql, where;
+    cleanObj(obj);
     updateSql = [];
     updateProps = [];
     where = makeWhere(whereObj);
@@ -519,6 +531,7 @@
   };
 
   insert = function(table, obj, cb, isServer) {
+    cleanObj(obj);
     if (Object.prototype.toString.call(obj) === '[object Array]') {
       return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
     } else {

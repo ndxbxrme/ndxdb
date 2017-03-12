@@ -256,7 +256,8 @@ exec = (sql, props, notCritical, isServer, cb) ->
           isServer: isServer
       callback()
   if isSelect
-    safeCallback 'select', null
+    safeCallback 'select', 
+      isServer: isServer
   if error
     output.error = error
   output
@@ -337,7 +338,13 @@ count = (table, whereObj, cb) ->
   if res and res.length
     return res[0].c
   0
+cleanObj = (obj) ->
+  for key of obj
+    if key.indexOf('$') is 0
+      delete obj[key]
+  return
 update = (table, obj, whereObj, cb, isServer) ->
+  cleanObj obj
   updateSql = []
   updateProps = []
   where = makeWhere whereObj
@@ -350,6 +357,7 @@ update = (table, obj, whereObj, cb, isServer) ->
   props = updateProps.concat where.props
   exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, isServer, cb
 insert = (table, obj, cb, isServer) ->
+  cleanObj obj
   if Object.prototype.toString.call(obj) is '[object Array]'
     exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
   else
