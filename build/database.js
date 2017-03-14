@@ -546,7 +546,7 @@
       where.sql = " WHERE " + where.sql;
     }
     test = exec("SELECT * FROM " + table + where.sql, where.props, null, isServer);
-    if (test && test.length) {
+    if (test && test.length && where.sql) {
       return update(table, obj, whereObj, cb, isServer);
     } else {
       return insert(table, obj, cb, isServer);

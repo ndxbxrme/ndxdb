@@ -367,7 +367,7 @@ upsert = (table, obj, whereObj, cb, isServer) ->
   if where.sql
     where.sql = " WHERE #{where.sql}"
   test = exec "SELECT * FROM #{table}#{where.sql}", where.props, null, isServer
-  if test and test.length
+  if test and test.length and where.sql
     update table, obj, whereObj, cb, isServer
   else
     insert table, obj, cb, isServer
