@@ -241,12 +241,6 @@ exec = (sql, props, notCritical, isServer, cb) ->
       res = database.exec 'SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]
       if res and res.length
         r = res[0]
-        safeCallback 'preUpdate',
-          id: getId r
-          table: updateId.ndxtable
-          obj: r
-          args: args
-          isServer: isServer
         storage.put settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical
         safeCallback 'update',
           id: getId r
@@ -301,7 +295,7 @@ select = (table, args, cb, isServer) ->
     table: table
     isServer: isServer
   args = args or {}
-  where = makeWhere args.where
+  where = makeWhere if args.where then args.where else args
   sorting = ''
   if args.sort
     sorting += " ORDER BY #{args.sort}"
@@ -345,6 +339,12 @@ cleanObj = (obj) ->
   return
 update = (table, obj, whereObj, cb, isServer) ->
   cleanObj obj
+  safeCallback 'preUpdate',
+    id: getId obj
+    table: table
+    obj: obj
+    args: null
+    isServer: isServer
   updateSql = []
   updateProps = []
   where = makeWhere whereObj

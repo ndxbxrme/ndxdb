@@ -372,13 +372,6 @@
         res = database.exec('SELECT * FROM ' + updateId.ndxtable + ' WHERE ' + getIdField(updateId) + '=?', [getId(updateId)]);
         if (res && res.length) {
           r = res[0];
-          safeCallback('preUpdate', {
-            id: getId(r),
-            table: updateId.ndxtable,
-            obj: r,
-            args: args,
-            isServer: isServer
-          });
           storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
           safeCallback('update', {
             id: getId(r),
@@ -449,7 +442,7 @@
       isServer: isServer
     });
     args = args || {};
-    where = makeWhere(args.where);
+    where = makeWhere(args.where ? args.where : args);
     sorting = '';
     if (args.sort) {
       sorting += " ORDER BY " + args.sort;
@@ -514,6 +507,13 @@
   update = function(table, obj, whereObj, cb, isServer) {
     var key, props, updateProps, updateSql, where;
     cleanObj(obj);
+    safeCallback('preUpdate', {
+      id: getId(obj),
+      table: table,
+      obj: obj,
+      args: null,
+      isServer: isServer
+    });
     updateSql = [];
     updateProps = [];
     where = makeWhere(whereObj);
