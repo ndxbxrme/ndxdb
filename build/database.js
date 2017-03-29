@@ -477,7 +477,6 @@
         return cb(output);
       };
     }
-    console.log("SELECT * FROM " + table + where.sql + sorting);
     output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, cb);
     if (output && output.length) {
       return safeCallback('select', {

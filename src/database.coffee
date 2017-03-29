@@ -319,7 +319,6 @@ select = (table, args, cb, isServer) ->
           objs: output
           isServer: isServer
       cb output
-  console.log "SELECT * FROM #{table}#{where.sql}#{sorting}"
   output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  cb
   if output and output.length
     safeCallback 'select', 
