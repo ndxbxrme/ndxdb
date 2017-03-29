@@ -256,6 +256,8 @@ exec = (sql, props, notCritical, isServer, cb) ->
     output.error = error
   output
 makeWhere = (whereObj) ->
+  if not whereObj or whereObj.sort or whereObj.sortDir
+    return sql: ''
   sql = ''
   props = []
   parent = ''
@@ -317,6 +319,7 @@ select = (table, args, cb, isServer) ->
           objs: output
           isServer: isServer
       cb output
+  console.log "SELECT * FROM #{table}#{where.sql}#{sorting}"
   output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  cb
   if output and output.length
     safeCallback 'select', 

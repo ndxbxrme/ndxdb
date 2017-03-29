@@ -397,6 +397,11 @@
 
   makeWhere = function(whereObj) {
     var parent, parse, props, sql;
+    if (!whereObj || whereObj.sort || whereObj.sortDir) {
+      return {
+        sql: ''
+      };
+    }
     sql = '';
     props = [];
     parent = '';
@@ -472,6 +477,7 @@
         return cb(output);
       };
     }
+    console.log("SELECT * FROM " + table + where.sql + sorting);
     output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, cb);
     if (output && output.length) {
       return safeCallback('select', {
