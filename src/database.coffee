@@ -354,7 +354,7 @@ update = (table, obj, whereObj, cb, isServer) ->
     where.sql = " WHERE #{where.sql}"
   for key of obj
     if where.props.indexOf(obj[key]) is -1
-      updateSql.push " #{key}=? "
+      updateSql.push " `#{key}`=? "
       updateProps.push obj[key]
   props = updateProps.concat where.props
   exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, isServer, cb

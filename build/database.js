@@ -527,7 +527,7 @@
     }
     for (key in obj) {
       if (where.props.indexOf(obj[key]) === -1) {
-        updateSql.push(" " + key + "=? ");
+        updateSql.push(" `" + key + "`=? ");
         updateProps.push(obj[key]);
       }
     }
