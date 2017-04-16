@@ -36,7 +36,7 @@ restoreDatabase = (data, cb) ->
     if database.tables[key]
       database.exec 'DELETE FROM ' + key
       database.exec 'INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]
-  safeCallback 'restore', database
+  syncCallback 'restore', database
   cb?()
 getId = (row) ->
   row[settings.AUTO_ID] or row.id or row._id or row.i
@@ -47,9 +47,19 @@ getIdField = (row) ->
   else if row._id then output = '_id'
   else if row.i then output = 'i'
   output
-safeCallback = (name, obj) ->
-  for cb in callbacks[name]
-    cb obj
+syncCallback = (name, obj, cb) ->
+  if callbacks[name] and callbacks[name].length
+    for callback in callbacks[name]
+      callback obj
+  cb?()
+asyncCallback = (name, obj, cb) ->
+  if callbacks[name] and callbacks[name].length
+    async.eachSeries callbacks[name], (cbitem, callback) ->
+      cbitem obj, callback
+    , ->
+      cb?()
+  else
+    cb?()
 deleteKeys = (cb) ->
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if not e and r and r.Contents
@@ -106,7 +116,7 @@ attachDatabase = ->
         deleteKeys ->
           saveDatabase ->
             console.log "ndxdb v#{version} ready"
-            safeCallback 'ready', database
+            syncCallback 'ready', database
     ###
     setInterval ->
       maintenanceMode = true
@@ -123,7 +133,7 @@ attachDatabase = ->
     maintenanceMode = false
     setImmediate ->
       console.log "ndxdb v#{version} ready"
-      safeCallback 'ready', database
+      syncCallback 'ready', database
 exec = (sql, props, notCritical, isServer, cb) ->
   if maintenanceMode
     cb? []
@@ -187,13 +197,8 @@ exec = (sql, props, notCritical, isServer, cb) ->
           delObj =
             '__!deleteMe!': true
           delObj[getIdField(r)] = getId r
-          safeCallback 'preDelete', 
-            id: getId r
-            table: table
-            obj: delObj
-            isServer: isServer
           storage.put settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical
-          safeCallback 'delete', 
+          asyncCallback (if isServer then 'serverDelete' else 'delete'), 
             id: getId r
             table: table
             obj: delObj
@@ -204,14 +209,8 @@ exec = (sql, props, notCritical, isServer, cb) ->
         for prop in props[0]
           if settings.AUTO_DATE
             prop.u = new Date().valueOf()
-          safeCallback 'preInsert', 
-            id: getId prop
-            table: table
-            obj: prop
-            args: args
-            isServer: isServer
           storage.put settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical
-          safeCallback 'insert', 
+          asyncCallback (if isServer then 'serverInsert' else 'insert'), 
             id: getId prop
             table: table
             obj: prop
@@ -220,14 +219,8 @@ exec = (sql, props, notCritical, isServer, cb) ->
       else
         if settings.AUTO_DATE
           props[0].u = new Date().valueOf();
-        safeCallback 'preInsert',
-          id: getId props[0]
-          table: table
-          obj: props[0]
-          args: args
-          isServer: isServer
         storage.put settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical
-        safeCallback 'insert',
+        asyncCallback (if isServer then 'serverInsert' else 'insert'),
           id: getId props[0]
           table: table
           obj: props[0]
@@ -242,21 +235,18 @@ exec = (sql, props, notCritical, isServer, cb) ->
       if res and res.length
         r = res[0]
         storage.put settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical
-        safeCallback 'update',
+        asyncCallback (if isServer then 'serverUpdate' else 'update'),
           id: getId r
           table: updateId.ndxtable
           obj: r
           args: args
           isServer: isServer
       callback()
-  if isSelect
-    safeCallback 'select', 
-      isServer: isServer
   if error
     output.error = error
   output
 makeWhere = (whereObj) ->
-  if not whereObj or whereObj.sort or whereObj.sortDir
+  if not whereObj or whereObj.sort or whereObj.sortDir or whereObj.pageSize
     return sql: ''
   sql = ''
   props = []
@@ -293,39 +283,36 @@ makeWhere = (whereObj) ->
     props: props
   }
 select = (table, args, cb, isServer) ->
-  safeCallback 'preSelect', 
-    table: table
-    isServer: isServer
-  args = args or {}
-  where = makeWhere if args.where then args.where else args
-  sorting = ''
-  if args.sort
-    sorting += " ORDER BY #{args.sort}"
-    if args.sortDir
-      sorting += " #{args.sortDir}"
-  if args.page or args.pageSize
-    args.page = args.page or 1
-    args.pageSize = args.pageSize or 10
-    start = ((args.page - 1) * args.pageSize) + 1
-    sorting += " LIMIT #{args.pageSize} OFFSET #{start}"
-  if where.sql
-    where.sql = " WHERE #{where.sql}"
-  myCb = null
-  if cb
-    myCb = (output) ->
-      if output and output.length
-        safeCallback 'select', 
+  ((user) ->
+    asyncCallback (if isServer then 'serverPreSelect' else 'preSelect'), 
+      table: table
+      args: args
+      user: user
+    , ->
+      args = args or {}
+      where = makeWhere if args.where then args.where else args
+      sorting = ''
+      if args.sort
+        sorting += " ORDER BY #{args.sort}"
+        if args.sortDir
+          sorting += " #{args.sortDir}"
+      if where.sql
+        where.sql = " WHERE #{where.sql}"
+      myCb = (output) ->
+        asyncCallback (if isServer then 'serverSelect' else 'select'), 
           table: table
           objs: output
           isServer: isServer
-      cb output
-  output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  cb
-  if output and output.length
-    safeCallback 'select', 
-      table: table
-      objs: output
-      isServer: isServer
-
+          user: user
+        , ->
+          total = output.length
+          if args.page or args.pageSize
+            args.page = args.page or 1
+            args.pageSize = args.pageSize or 10
+            output = output.splice (args.page - 1) * args.pageSize, args.pageSize
+          cb? output, total
+      output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  myCb
+  )(ndx.user)
 count = (table, whereObj, cb, isServer) ->
   where = makeWhere whereObj
   if where.sql
@@ -341,29 +328,38 @@ cleanObj = (obj) ->
   return
 update = (table, obj, whereObj, cb, isServer) ->
   cleanObj obj
-  safeCallback 'preUpdate',
-    id: getId obj
-    table: table
-    obj: obj
-    args: null
-    isServer: isServer
-  updateSql = []
-  updateProps = []
-  where = makeWhere whereObj
-  if where.sql
-    where.sql = " WHERE #{where.sql}"
-  for key of obj
-    if where.props.indexOf(obj[key]) is -1
-      updateSql.push " `#{key}`=? "
-      updateProps.push obj[key]
-  props = updateProps.concat where.props
-  exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, isServer, cb
+  ((user) ->
+    asyncCallback (if isServer then 'serverPreUpdate' else 'preUpdate'),
+      id: getId obj
+      table: table
+      obj: obj
+      user: user
+    , ->
+      updateSql = []
+      updateProps = []
+      where = makeWhere whereObj
+      if where.sql
+        where.sql = " WHERE #{where.sql}"
+      for key of obj
+        if where.props.indexOf(obj[key]) is -1
+          updateSql.push " `#{key}`=? "
+          updateProps.push obj[key]
+      props = updateProps.concat where.props
+      exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, isServer, cb
+  )(ndx.user)
 insert = (table, obj, cb, isServer) ->
   cleanObj obj
-  if Object.prototype.toString.call(obj) is '[object Array]'
-    exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
-  else
-    exec "INSERT INTO #{table} VALUES ?", [obj], null, isServer, cb
+  ((user) ->
+    asyncCallback (if isServer then 'serverPreInsert' else 'preInsert'),
+      table: table
+      obj: obj
+      user: user
+    , ->
+      if Object.prototype.toString.call(obj) is '[object Array]'
+        exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
+      else
+        exec "INSERT INTO #{table} VALUES ?", [obj], null, isServer, cb
+  )(ndx.user)
 upsert = (table, obj, whereObj, cb, isServer) ->
   where = makeWhere whereObj
   if where.sql
@@ -374,15 +370,20 @@ upsert = (table, obj, whereObj, cb, isServer) ->
   else
     insert table, obj, cb, isServer
 del = (table, id, cb, isServer) ->
-  exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, isServer, cb
-  
+  ((user) ->
+    asyncCallback (if isServer then 'serverPreDelete' else 'preDelete'),
+      table: table
+      id: id
+      user: user
+    , ->
+      exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, isServer, cb
+  )(ndx.user)  
 
 module.exports =
   config: (config) ->
     for key of config
       keyU = underscored(key).toUpperCase()
-      keyC = camelize(keyU.replace(/_/g, ' ')).replace(/^./, key[0].toLowerCase())
-      settings[keyU] = config[keyC] or config[keyU] or settings[keyU]
+      settings[keyU] = config[key] or config[keyU] or settings[keyU]
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE or 100
     storage.checkDataDir()
@@ -413,7 +414,7 @@ module.exports =
         '__!deleteMe!': true
       delObj[idField] = args.id
       storage.put settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true
-    safeCallback type, args
+    asyncCallback type, args
   exec: exec
   select: select
   count: count

@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, safeCallback, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, underscored, update, upsert, version;
+  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upsert, version;
 
   fs = require('fs');
 
@@ -62,7 +62,7 @@
         database.exec('INSERT INTO ' + key + ' SELECT * FROM ?', [data[key].data]);
       }
     }
-    safeCallback('restore', database);
+    syncCallback('restore', database);
     return typeof cb === "function" ? cb() : void 0;
   };
 
@@ -85,15 +85,28 @@
     return output;
   };
 
-  safeCallback = function(name, obj) {
-    var cb, j, len, ref, results;
-    ref = callbacks[name];
-    results = [];
-    for (j = 0, len = ref.length; j < len; j++) {
-      cb = ref[j];
-      results.push(cb(obj));
+  syncCallback = function(name, obj, cb) {
+    var callback, j, len, ref;
+    if (callbacks[name] && callbacks[name].length) {
+      ref = callbacks[name];
+      for (j = 0, len = ref.length; j < len; j++) {
+        callback = ref[j];
+        callback(obj);
+      }
     }
-    return results;
+    return typeof cb === "function" ? cb() : void 0;
+  };
+
+  asyncCallback = function(name, obj, cb) {
+    if (callbacks[name] && callbacks[name].length) {
+      return async.eachSeries(callbacks[name], function(cbitem, callback) {
+        return cbitem(obj, callback);
+      }, function() {
+        return typeof cb === "function" ? cb() : void 0;
+      });
+    } else {
+      return typeof cb === "function" ? cb() : void 0;
+    }
   };
 
   deleteKeys = function(cb) {
@@ -182,7 +195,7 @@
           return deleteKeys(function() {
             return saveDatabase(function() {
               console.log("ndxdb v" + version + " ready");
-              return safeCallback('ready', database);
+              return syncCallback('ready', database);
             });
           });
         });
@@ -204,7 +217,7 @@
       maintenanceMode = false;
       return setImmediate(function() {
         console.log("ndxdb v" + version + " ready");
-        return safeCallback('ready', database);
+        return syncCallback('ready', database);
       });
     }
   };
@@ -300,14 +313,8 @@
               '__!deleteMe!': true
             };
             delObj[getIdField(r)] = getId(r);
-            safeCallback('preDelete', {
-              id: getId(r),
-              table: table,
-              obj: delObj,
-              isServer: isServer
-            });
             storage.put(settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical);
-            safeCallback('delete', {
+            asyncCallback((isServer ? 'serverDelete' : 'delete'), {
               id: getId(r),
               table: table,
               obj: delObj,
@@ -324,15 +331,8 @@
             if (settings.AUTO_DATE) {
               prop.u = new Date().valueOf();
             }
-            safeCallback('preInsert', {
-              id: getId(prop),
-              table: table,
-              obj: prop,
-              args: args,
-              isServer: isServer
-            });
             storage.put(settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical);
-            safeCallback('insert', {
+            asyncCallback((isServer ? 'serverInsert' : 'insert'), {
               id: getId(prop),
               table: table,
               obj: prop,
@@ -344,15 +344,8 @@
           if (settings.AUTO_DATE) {
             props[0].u = new Date().valueOf();
           }
-          safeCallback('preInsert', {
-            id: getId(props[0]),
-            table: table,
-            obj: props[0],
-            args: args,
-            isServer: isServer
-          });
           storage.put(settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical);
-          safeCallback('insert', {
+          asyncCallback((isServer ? 'serverInsert' : 'insert'), {
             id: getId(props[0]),
             table: table,
             obj: props[0],
@@ -373,7 +366,7 @@
         if (res && res.length) {
           r = res[0];
           storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
-          safeCallback('update', {
+          asyncCallback((isServer ? 'serverUpdate' : 'update'), {
             id: getId(r),
             table: updateId.ndxtable,
             obj: r,
@@ -384,11 +377,6 @@
         return callback();
       });
     }
-    if (isSelect) {
-      safeCallback('select', {
-        isServer: isServer
-      });
-    }
     if (error) {
       output.error = error;
     }
@@ -397,7 +385,7 @@
 
   makeWhere = function(whereObj) {
     var parent, parse, props, sql;
-    if (!whereObj || whereObj.sort || whereObj.sortDir) {
+    if (!whereObj || whereObj.sort || whereObj.sortDir || whereObj.pageSize) {
       return {
         sql: ''
       };
@@ -441,50 +429,45 @@
   };
 
   select = function(table, args, cb, isServer) {
-    var myCb, output, sorting, start, where;
-    safeCallback('preSelect', {
-      table: table,
-      isServer: isServer
-    });
-    args = args || {};
-    where = makeWhere(args.where ? args.where : args);
-    sorting = '';
-    if (args.sort) {
-      sorting += " ORDER BY " + args.sort;
-      if (args.sortDir) {
-        sorting += " " + args.sortDir;
-      }
-    }
-    if (args.page || args.pageSize) {
-      args.page = args.page || 1;
-      args.pageSize = args.pageSize || 10;
-      start = ((args.page - 1) * args.pageSize) + 1;
-      sorting += " LIMIT " + args.pageSize + " OFFSET " + start;
-    }
-    if (where.sql) {
-      where.sql = " WHERE " + where.sql;
-    }
-    myCb = null;
-    if (cb) {
-      myCb = function(output) {
-        if (output && output.length) {
-          safeCallback('select', {
+    return (function(user) {
+      return asyncCallback((isServer ? 'serverPreSelect' : 'preSelect'), {
+        table: table,
+        args: args,
+        user: user
+      }, function() {
+        var myCb, output, sorting, where;
+        args = args || {};
+        where = makeWhere(args.where ? args.where : args);
+        sorting = '';
+        if (args.sort) {
+          sorting += " ORDER BY " + args.sort;
+          if (args.sortDir) {
+            sorting += " " + args.sortDir;
+          }
+        }
+        if (where.sql) {
+          where.sql = " WHERE " + where.sql;
+        }
+        myCb = function(output) {
+          return asyncCallback((isServer ? 'serverSelect' : 'select'), {
             table: table,
             objs: output,
-            isServer: isServer
+            isServer: isServer,
+            user: user
+          }, function() {
+            var total;
+            total = output.length;
+            if (args.page || args.pageSize) {
+              args.page = args.page || 1;
+              args.pageSize = args.pageSize || 10;
+              output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
+            }
+            return typeof cb === "function" ? cb(output, total) : void 0;
           });
-        }
-        return cb(output);
-      };
-    }
-    output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, cb);
-    if (output && output.length) {
-      return safeCallback('select', {
-        table: table,
-        objs: output,
-        isServer: isServer
+        };
+        return output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, myCb);
       });
-    }
+    })(ndx.user);
   };
 
   count = function(table, whereObj, cb, isServer) {
@@ -510,38 +493,48 @@
   };
 
   update = function(table, obj, whereObj, cb, isServer) {
-    var key, props, updateProps, updateSql, where;
     cleanObj(obj);
-    safeCallback('preUpdate', {
-      id: getId(obj),
-      table: table,
-      obj: obj,
-      args: null,
-      isServer: isServer
-    });
-    updateSql = [];
-    updateProps = [];
-    where = makeWhere(whereObj);
-    if (where.sql) {
-      where.sql = " WHERE " + where.sql;
-    }
-    for (key in obj) {
-      if (where.props.indexOf(obj[key]) === -1) {
-        updateSql.push(" `" + key + "`=? ");
-        updateProps.push(obj[key]);
-      }
-    }
-    props = updateProps.concat(where.props);
-    return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, isServer, cb);
+    return (function(user) {
+      return asyncCallback((isServer ? 'serverPreUpdate' : 'preUpdate'), {
+        id: getId(obj),
+        table: table,
+        obj: obj,
+        user: user
+      }, function() {
+        var key, props, updateProps, updateSql, where;
+        updateSql = [];
+        updateProps = [];
+        where = makeWhere(whereObj);
+        if (where.sql) {
+          where.sql = " WHERE " + where.sql;
+        }
+        for (key in obj) {
+          if (where.props.indexOf(obj[key]) === -1) {
+            updateSql.push(" `" + key + "`=? ");
+            updateProps.push(obj[key]);
+          }
+        }
+        props = updateProps.concat(where.props);
+        return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, isServer, cb);
+      });
+    })(ndx.user);
   };
 
   insert = function(table, obj, cb, isServer) {
     cleanObj(obj);
-    if (Object.prototype.toString.call(obj) === '[object Array]') {
-      return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
-    } else {
-      return exec("INSERT INTO " + table + " VALUES ?", [obj], null, isServer, cb);
-    }
+    return (function(user) {
+      return asyncCallback((isServer ? 'serverPreInsert' : 'preInsert'), {
+        table: table,
+        obj: obj,
+        user: user
+      }, function() {
+        if (Object.prototype.toString.call(obj) === '[object Array]') {
+          return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
+        } else {
+          return exec("INSERT INTO " + table + " VALUES ?", [obj], null, isServer, cb);
+        }
+      });
+    })(ndx.user);
   };
 
   upsert = function(table, obj, whereObj, cb, isServer) {
@@ -559,16 +552,23 @@
   };
 
   del = function(table, id, cb, isServer) {
-    return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, isServer, cb);
+    return (function(user) {
+      return asyncCallback((isServer ? 'serverPreDelete' : 'preDelete'), {
+        table: table,
+        id: id,
+        user: user
+      }, function() {
+        return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, isServer, cb);
+      });
+    })(ndx.user);
   };
 
   module.exports = {
     config: function(config) {
-      var key, keyC, keyU;
+      var key, keyU;
       for (key in config) {
         keyU = underscored(key).toUpperCase();
-        keyC = camelize(keyU.replace(/_/g, ' ')).replace(/^./, key[0].toLowerCase());
-        settings[keyU] = config[keyC] || config[keyU] || settings[keyU];
+        settings[keyU] = config[key] || config[keyU] || settings[keyU];
       }
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
       settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE || 100;
@@ -608,7 +608,7 @@
         delObj[idField] = args.id;
         storage.put(settings.DATABASE + ':node:' + args.table + '/' + args.id, args.obj, null, true);
       }
-      return safeCallback(type, args);
+      return asyncCallback(type, args);
     },
     exec: exec,
     select: select,

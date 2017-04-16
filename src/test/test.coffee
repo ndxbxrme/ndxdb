@@ -1,4 +1,4 @@
-db = require('../database.js')
+db = require '../database.js'
 .config
   database: 'testdb'
   tables: ['table1', 'table2']
@@ -24,6 +24,7 @@ test = ->
         population: 321418000
       }
     ];
-    db.upsert 'table1', vals[0], 'country=?', [vals[0].country]
+    db.upsert 'table1', vals[0], 
+      country: vals[0].country
     result = db.exec 'SELECT * FROM table1 WHERE population > ? ORDER BY population ASC', [500000000]
     console.log 'result', result
