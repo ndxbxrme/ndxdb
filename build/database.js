@@ -281,10 +281,14 @@
           ref1 = props[0];
           for (k = 0, len1 = ref1.length; k < len1; k++) {
             prop = ref1[k];
-            prop[settings.AUTO_ID] = ObjectID.generate();
+            if (!prop[settings.AUTO_ID]) {
+              prop[settings.AUTO_ID] = ObjectID.generate();
+            }
           }
         } else {
-          props[0][settings.AUTO_ID] = ObjectID.generate();
+          if (!props[0][settings.AUTO_ID]) {
+            props[0][settings.AUTO_ID] = ObjectID.generate();
+          }
         }
       }
       updateIds = [];

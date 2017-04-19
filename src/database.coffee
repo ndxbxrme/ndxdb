@@ -174,9 +174,11 @@ exec = (sql, props, notCritical, isServer, cb) ->
     if settings.AUTO_ID and isInsert
       if Object.prototype.toString.call(props[0]) is '[object Array]'
         for prop in props[0]
-          prop[settings.AUTO_ID] = ObjectID.generate()
+          if not prop[settings.AUTO_ID]
+            prop[settings.AUTO_ID] = ObjectID.generate()
       else
-        props[0][settings.AUTO_ID] = ObjectID.generate()
+        if not props[0][settings.AUTO_ID]
+          props[0][settings.AUTO_ID] = ObjectID.generate()
     updateIds = []
     if isUpdate
       idWhere = ''
