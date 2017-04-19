@@ -451,4 +451,7 @@ module.exports =
         cb?()
   resetSqlCache: ->
     database.resetSqlCache()
+  setNdx: (_ndx) ->
+    ndx = _ndx
+    @
   alasql: alasql

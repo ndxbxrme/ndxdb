@@ -662,6 +662,10 @@
     resetSqlCache: function() {
       return database.resetSqlCache();
     },
+    setNdx: function(_ndx) {
+      ndx = _ndx;
+      return this;
+    },
     alasql: alasql
   };
 
