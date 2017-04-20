@@ -371,14 +371,17 @@ upsert = (table, obj, whereObj, cb, isServer) ->
     update table, obj, whereObj, cb, isServer
   else
     insert table, obj, cb, isServer
-del = (table, id, cb, isServer) ->
+del = (table, whereObj, cb, isServer) ->
+  where = makeWhere whereObj
+  if where.sql
+    where.sql = " WHERE #{where.sql}"
   ((user) ->
     asyncCallback (if isServer then 'serverPreDelete' else 'preDelete'),
       table: table
-      id: id
+      where: whereObj
       user: user
     , ->
-      exec "DELETE FROM #{table} WHERE #{settings.AUTO_ID}=?", [id], null, isServer, cb
+      exec "DELETE FROM #{table}#{where.sql}", where.props, null, isServer, cb
   )(ndx.user)  
 
 module.exports =

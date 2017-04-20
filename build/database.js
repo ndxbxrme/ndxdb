@@ -555,14 +555,19 @@
     }
   };
 
-  del = function(table, id, cb, isServer) {
+  del = function(table, whereObj, cb, isServer) {
+    var where;
+    where = makeWhere(whereObj);
+    if (where.sql) {
+      where.sql = " WHERE " + where.sql;
+    }
     return (function(user) {
       return asyncCallback((isServer ? 'serverPreDelete' : 'preDelete'), {
         table: table,
-        id: id,
+        where: whereObj,
         user: user
       }, function() {
-        return exec("DELETE FROM " + table + " WHERE " + settings.AUTO_ID + "=?", [id], null, isServer, cb);
+        return exec("DELETE FROM " + table + where.sql, where.props, null, isServer, cb);
       });
     })(ndx.user);
   };
