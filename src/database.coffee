@@ -335,6 +335,7 @@ update = (table, obj, whereObj, cb, isServer) ->
       id: getId obj
       table: table
       obj: obj
+      where: whereObj
       user: user
     , ->
       updateSql = []

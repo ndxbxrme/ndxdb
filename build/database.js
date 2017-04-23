@@ -503,6 +503,7 @@
         id: getId(obj),
         table: table,
         obj: obj,
+        where: whereObj,
         user: user
       }, function() {
         var key, props, updateProps, updateSql, where;
