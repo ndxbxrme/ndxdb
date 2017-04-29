@@ -54,16 +54,19 @@ syncCallback = (name, obj, cb) ->
       truth = truth and callback obj
   cb? truth
 asyncCallback = (name, obj, cb) ->
-  truth = true
+  truth = false
   if callbacks[name] and callbacks[name].length
     async.eachSeries callbacks[name], (cbitem, callback) ->
-      cbitem obj, (result) ->
-        truth = truth and result
+      if not truth
+        cbitem obj, (result) ->
+          truth = truth and result
+          callback()
+      else
         callback()
     , ->
       cb? truth
   else
-    cb? truth
+    cb? true
 deleteKeys = (cb) ->
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if not e and r and r.Contents
