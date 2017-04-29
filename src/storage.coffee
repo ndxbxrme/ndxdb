@@ -66,21 +66,21 @@ module.exports = ->
         st = st.pipe writeStream
       else
         for device in devices
-          ws = device.getWriteStream(key)
-          st = st.pipe ws
+          writeStream = device.getWriteStream(key)
+          st = st.pipe writeStream
       jsStringify.write o, ->
         jsStringify.flush()
       jsStringify.end()
       st.on 'close', ->
         cb? null, null
       st.on 'error', (er) ->
-      ws.on 'error', (er) ->
-      ws.on 'uploaded', (res) ->
+      writeStream.on 'error', (er) ->
+      writeStream.on 'uploaded', (res) ->
         cb? null, null
       gzip.on 'error', (er) ->
       encrypt.on 'error', (er) ->
       #jsStringify.end()
-  get: (key, cb) ->
+  get: (key, cb, reader) ->
     if not devices
       cb? 'no devices', null
       done?()
@@ -92,7 +92,8 @@ module.exports = ->
       async.eachSeries devices, (device, callback) ->
         if not finished
           calledBack = false
-          reader = device.getReadStream key
+          if not reader
+            reader = device.getReadStream key
           st = reader
           if doencrypt
             st = st.pipe decrypt

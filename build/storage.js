@@ -98,8 +98,8 @@
           } else {
             for (i = 0, len = devices.length; i < len; i++) {
               device = devices[i];
-              ws = device.getWriteStream(key);
-              st = st.pipe(ws);
+              writeStream = device.getWriteStream(key);
+              st = st.pipe(writeStream);
             }
           }
           jsStringify.write(o, function() {
@@ -110,15 +110,15 @@
             return typeof cb === "function" ? cb(null, null) : void 0;
           });
           st.on('error', function(er) {});
-          ws.on('error', function(er) {});
-          ws.on('uploaded', function(res) {
+          writeStream.on('error', function(er) {});
+          writeStream.on('uploaded', function(res) {
             return typeof cb === "function" ? cb(null, null) : void 0;
           });
           gzip.on('error', function(er) {});
           return encrypt.on('error', function(er) {});
         }
       },
-      get: function(key, cb) {
+      get: function(key, cb, reader) {
         var decrypt, finished, gunzip, jsParse;
         if (!devices) {
           if (typeof cb === "function") {
@@ -131,10 +131,12 @@
           gunzip = zlib.createGunzip();
           finished = false;
           return async.eachSeries(devices, function(device, callback) {
-            var calledBack, reader, st;
+            var calledBack, st;
             if (!finished) {
               calledBack = false;
-              reader = device.getReadStream(key);
+              if (!reader) {
+                reader = device.getReadStream(key);
+              }
               st = reader;
               if (doencrypt) {
                 st = st.pipe(decrypt);

@@ -95,10 +95,11 @@ inflate = (from, cb, getFn) ->
         inflate r.Contents[r.Contents.length-1].Key, cb
       else
         cb?()
-saveDatabase = (cb) ->
+saveDatabase = (cb, writeStream) ->
   storage.put settings.DATABASE + ':database', database.tables, (e) ->
     maintenanceMode = false
     cb?()
+  , false, writeStream
 attachDatabase = ->
   maintenanceMode = true
   alasql 'CREATE DATABASE ' + settings.DATABASE
@@ -111,14 +112,14 @@ attachDatabase = ->
   if settings.AWS_OK or settings.LOCAL_STORAGE
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o
-        restoreDatabase o
+        restoreDatabase o, ->
+          inflate null, ->
+            deleteKeys ->
+              saveDatabase ->
+                console.log "ndxdb v#{version} ready"
+                syncCallback 'ready', database
       else
         return upgradeDatabase()
-      inflate null, ->
-        deleteKeys ->
-          saveDatabase ->
-            console.log "ndxdb v#{version} ready"
-            syncCallback 'ready', database
   else
     maintenanceMode = false
     setImmediate ->
@@ -128,25 +129,23 @@ upgradeDatabase = ->
   console.log 'upgrading database'
   storage.getOld settings.DATABASE + ':database', (e, o) ->
     if not e and o
-      restoreDatabase o
-    inflate null, ->
-      deleteKeys ->
-        saveDatabase ->
-          console.log "ndxdb v#{version} ready"
-          syncCallback 'ready', database
-    , storage.getOld
-    ###
-    setInterval ->
-      maintenanceMode = true
-      storage.put settings.DATABASE + ':database', database.tables, (e) ->
-        if not e
-          console.log 'database uploaded'
+      restoreDatabase o, ->
+        inflate null, ->
           deleteKeys ->
-            maintenanceMode = false
-        else
-          maintenanceMode = false
-    , 11 * 60 * 60 * 1000
-    ###
+            saveDatabase ->
+              console.log "ndxdb v#{version} ready"
+              syncCallback 'ready', database
+        , storage.getOld
+restoreFromBackup = (readStream) ->
+  maintenanceMode = true
+  storage.get '', (e, o) ->
+    if not e and o
+      restoreDatabase o, ->
+        deleteKeys ->
+          saveDatabase ->
+            console.log "backup restored"
+            syncCallback 'restore', null
+  , readStream
 exec = (sql, props, notCritical, isServer, cb) ->
   if maintenanceMode
     cb? []
@@ -460,11 +459,8 @@ module.exports =
     database.tables
   cacheSize: ->
     database.sqlCacheSize
-  restoreFromBackup: (data) ->
-    if data
-      restoreDatabase data, ->
-        deleteKeys ->
-          saveDatabase()
+  saveDatabase: saveDatabase
+  restoreFromBackup: restoreFromBackup
   consolidate: ->
     deleteKeys ->
       saveDatabase()

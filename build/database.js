@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upgradeDatabase, upsert, version;
+  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, restoreFromBackup, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -168,11 +168,11 @@
     });
   };
 
-  saveDatabase = function(cb) {
+  saveDatabase = function(cb, writeStream) {
     return storage.put(settings.DATABASE + ':database', database.tables, function(e) {
       maintenanceMode = false;
       return typeof cb === "function" ? cb() : void 0;
-    });
+    }, false, writeStream);
   };
 
   attachDatabase = function() {
@@ -192,18 +192,19 @@
     if (settings.AWS_OK || settings.LOCAL_STORAGE) {
       return storage.get(settings.DATABASE + ':database', function(e, o) {
         if (!e && o) {
-          restoreDatabase(o);
+          return restoreDatabase(o, function() {
+            return inflate(null, function() {
+              return deleteKeys(function() {
+                return saveDatabase(function() {
+                  console.log("ndxdb v" + version + " ready");
+                  return syncCallback('ready', database);
+                });
+              });
+            });
+          });
         } else {
           return upgradeDatabase();
         }
-        return inflate(null, function() {
-          return deleteKeys(function() {
-            return saveDatabase(function() {
-              console.log("ndxdb v" + version + " ready");
-              return syncCallback('ready', database);
-            });
-          });
-        });
       });
     } else {
       maintenanceMode = false;
@@ -218,30 +219,34 @@
     console.log('upgrading database');
     return storage.getOld(settings.DATABASE + ':database', function(e, o) {
       if (!e && o) {
-        restoreDatabase(o);
+        return restoreDatabase(o, function() {
+          return inflate(null, function() {
+            return deleteKeys(function() {
+              return saveDatabase(function() {
+                console.log("ndxdb v" + version + " ready");
+                return syncCallback('ready', database);
+              });
+            });
+          }, storage.getOld);
+        });
       }
-      return inflate(null, function() {
-        return deleteKeys(function() {
-          return saveDatabase(function() {
-            console.log("ndxdb v" + version + " ready");
-            return syncCallback('ready', database);
+    });
+  };
+
+  restoreFromBackup = function(readStream) {
+    maintenanceMode = true;
+    return storage.get('', function(e, o) {
+      if (!e && o) {
+        return restoreDatabase(o, function() {
+          return deleteKeys(function() {
+            return saveDatabase(function() {
+              console.log("backup restored");
+              return syncCallback('restore', null);
+            });
           });
         });
-      }, storage.getOld);
-
-      /*
-      setInterval ->
-        maintenanceMode = true
-        storage.put settings.DATABASE + ':database', database.tables, (e) ->
-          if not e
-            console.log 'database uploaded'
-            deleteKeys ->
-              maintenanceMode = false
-          else
-            maintenanceMode = false
-      , 11 * 60 * 60 * 1000
-       */
-    });
+      }
+    }, readStream);
   };
 
   exec = function(sql, props, notCritical, isServer, cb) {
@@ -673,15 +678,8 @@
     cacheSize: function() {
       return database.sqlCacheSize;
     },
-    restoreFromBackup: function(data) {
-      if (data) {
-        return restoreDatabase(data, function() {
-          return deleteKeys(function() {
-            return saveDatabase();
-          });
-        });
-      }
-    },
+    saveDatabase: saveDatabase,
+    restoreFromBackup: restoreFromBackup,
     consolidate: function() {
       return deleteKeys(function() {
         return saveDatabase();
