@@ -103,14 +103,10 @@
     truth = false;
     if (callbacks[name] && callbacks[name].length) {
       return async.eachSeries(callbacks[name], function(cbitem, callback) {
-        if (!truth) {
-          return cbitem(obj, function(result) {
-            truth = truth || result;
-            return callback();
-          });
-        } else {
+        return cbitem(obj, function(result) {
+          truth = truth || result;
           return callback();
-        }
+        });
       }, function() {
         return typeof cb === "function" ? cb(truth) : void 0;
       });

@@ -57,11 +57,8 @@ asyncCallback = (name, obj, cb) ->
   truth = false
   if callbacks[name] and callbacks[name].length
     async.eachSeries callbacks[name], (cbitem, callback) ->
-      if not truth
-        cbitem obj, (result) ->
-          truth = truth or result
-          callback()
-      else
+      cbitem obj, (result) ->
+        truth = truth or result
         callback()
     , ->
       cb? truth
