@@ -86,21 +86,20 @@
   };
 
   syncCallback = function(name, obj, cb) {
-    var callback, j, len, ref, truth;
-    truth = true;
+    var callback, j, len, ref;
     if (callbacks[name] && callbacks[name].length) {
       ref = callbacks[name];
       for (j = 0, len = ref.length; j < len; j++) {
         callback = ref[j];
-        truth = truth && callback(obj);
+        callback(obj);
       }
     }
-    return typeof cb === "function" ? cb(truth) : void 0;
+    return typeof cb === "function" ? cb() : void 0;
   };
 
   asyncCallback = function(name, obj, cb) {
     var truth;
-    truth = true;
+    truth = false;
     if (callbacks[name] && callbacks[name].length) {
       return async.eachSeries(callbacks[name], function(cbitem, callback) {
         return cbitem(obj, function(result) {

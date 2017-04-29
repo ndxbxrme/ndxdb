@@ -48,13 +48,12 @@ getIdField = (row) ->
   else if row.i then output = 'i'
   output
 syncCallback = (name, obj, cb) ->
-  truth = true
   if callbacks[name] and callbacks[name].length
     for callback in callbacks[name]
-      truth = truth and callback obj
-  cb? truth
+      callback obj
+  cb?()
 asyncCallback = (name, obj, cb) ->
-  truth = true
+  truth = false
   if callbacks[name] and callbacks[name].length
     async.eachSeries callbacks[name], (cbitem, callback) ->
       cbitem obj, (result) ->
