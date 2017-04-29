@@ -7,7 +7,7 @@ async = require 'async'
 ObjectID = require 'bson-objectid'
 objtrans = require 'objtrans'
 settings = require './settings'
-storage = require('./storage')()
+storage = null
 underscored = require('underscore.string').underscored
 humanize = require('underscore.string').humanize
 camelize = require('underscore.string').camelize
@@ -70,14 +70,16 @@ deleteKeys = (cb) ->
         deleteKeys cb
     else
       cb()
-inflate = (from, cb) ->
+inflate = (from, cb, getFn) ->
+  if not getFn
+    getFn = storage.get
   storage.keys from, settings.DATABASE + ':node:', (e, r) ->
     if e or not r.Contents
       return console.log 'error', e
     async.eachSeries r.Contents, (key, callback) ->
-      key.Key.replace /(.+):(.+):(.+)\/(.+)/, (all, db, type, table, id) ->
+      key.Key.replace /(.+):(.+):(.+)\/(.+)(:.+)*/, (all, db, type, table, id, randId) ->
         if db and table and id and db is settings.DATABASE
-          storage.get key.Key, (e, o) ->
+          getFn key.Key, (e, o) ->
             if e
               return callback()
             idField = getIdField o
@@ -95,8 +97,6 @@ inflate = (from, cb) ->
         cb?()
 saveDatabase = (cb) ->
   storage.put settings.DATABASE + ':database', database.tables, (e) ->
-    #if not e
-    #  console.log 'database updated and uploaded'
     maintenanceMode = false
     cb?()
 attachDatabase = ->
@@ -112,11 +112,29 @@ attachDatabase = ->
     storage.get settings.DATABASE + ':database', (e, o) ->
       if not e and o
         restoreDatabase o
+      else
+        return upgradeDatabase()
       inflate null, ->
         deleteKeys ->
           saveDatabase ->
             console.log "ndxdb v#{version} ready"
             syncCallback 'ready', database
+  else
+    maintenanceMode = false
+    setImmediate ->
+      console.log "ndxdb v#{version} ready"
+      syncCallback 'ready', database
+upgradeDatabase = ->
+  console.log 'upgrading database'
+  storage.getOld settings.DATABASE + ':database', (e, o) ->
+    if not e and o
+      restoreDatabase o
+    inflate null, ->
+      deleteKeys ->
+        saveDatabase ->
+          console.log "ndxdb v#{version} ready"
+          syncCallback 'ready', database
+    , storage.getOld
     ###
     setInterval ->
       maintenanceMode = true
@@ -129,11 +147,6 @@ attachDatabase = ->
           maintenanceMode = false
     , 11 * 60 * 60 * 1000
     ###
-  else
-    maintenanceMode = false
-    setImmediate ->
-      console.log "ndxdb v#{version} ready"
-      syncCallback 'ready', database
 exec = (sql, props, notCritical, isServer, cb) ->
   if maintenanceMode
     cb? []
@@ -390,8 +403,14 @@ module.exports =
     for key of config
       keyU = underscored(key).toUpperCase()
       settings[keyU] = config[key] or config[keyU] or settings[keyU]
+    settings.AWS_BUCKET = settings.AWS_BUCKET or process.env.AWS_BUCKET
+    settings.AWS_ID = settings.AWS_ID or process.env.AWS_ID
+    settings.AWS_KEY = settings.AWS_KEY or process.env.AWS_KEY
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
-    settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE or 100
+    settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE or process.env.MAX_SQL_CACHE_SIZE or 100
+    settings.ENCRYPTION_KEY = settings.ENCRYPTION_KEY or process.env.ENCRYPTION_KEY
+    settings.DO_NOT_ENCRYPT = settings.DO_NOT_ENCRYPT or process.env.DO_NOT_ENCRYPT
+    storage = require('./storage')()
     storage.checkDataDir()
     @
   start: ->

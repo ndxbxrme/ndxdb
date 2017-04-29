@@ -2,6 +2,7 @@
 
 settings = require './settings'
 AWS = require 'aws-sdk'
+stream = require 'stream'
 
 module.exports = ->
   AWS.config.bucket = settings.AWS_BUCKET
@@ -9,6 +10,7 @@ module.exports = ->
   AWS.config.accessKeyId = settings.AWS_ID
   AWS.config.secretAccessKey = settings.AWS_KEY
   S3 = new AWS.S3()
+  s3Stream = require('s3-upload-stream') S3
   dbs: (cb) ->
     S3.listBuckets {}, (e, r) ->
       cb? e, r
@@ -47,3 +49,13 @@ module.exports = ->
       catch e
         return cb?(e or 'error', null)
       cb? null, d
+  getReadStream: (key) ->
+    m =
+      Bucket: AWS.config.bucket
+      Key: key
+    S3.getObject(m).createReadStream()
+  getWriteStream: (key) ->
+    upload = s3Stream.upload
+      Bucket: AWS.config.bucket
+      Key: key
+    upload

@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upsert, version;
+  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -16,7 +16,7 @@
 
   settings = require('./settings');
 
-  storage = require('./storage')();
+  storage = null;
 
   underscored = require('underscore.string').underscored;
 
@@ -129,15 +129,18 @@
     });
   };
 
-  inflate = function(from, cb) {
+  inflate = function(from, cb, getFn) {
+    if (!getFn) {
+      getFn = storage.get;
+    }
     return storage.keys(from, settings.DATABASE + ':node:', function(e, r) {
       if (e || !r.Contents) {
         return console.log('error', e);
       }
       return async.eachSeries(r.Contents, function(key, callback) {
-        return key.Key.replace(/(.+):(.+):(.+)\/(.+)/, function(all, db, type, table, id) {
+        return key.Key.replace(/(.+):(.+):(.+)\/(.+)(:.+)*/, function(all, db, type, table, id, randId) {
           if (db && table && id && db === settings.DATABASE) {
-            return storage.get(key.Key, function(e, o) {
+            return getFn(key.Key, function(e, o) {
               var idField;
               if (e) {
                 return callback();
@@ -190,6 +193,8 @@
       return storage.get(settings.DATABASE + ':database', function(e, o) {
         if (!e && o) {
           restoreDatabase(o);
+        } else {
+          return upgradeDatabase();
         }
         return inflate(null, function() {
           return deleteKeys(function() {
@@ -200,6 +205,29 @@
           });
         });
       });
+    } else {
+      maintenanceMode = false;
+      return setImmediate(function() {
+        console.log("ndxdb v" + version + " ready");
+        return syncCallback('ready', database);
+      });
+    }
+  };
+
+  upgradeDatabase = function() {
+    console.log('upgrading database');
+    return storage.getOld(settings.DATABASE + ':database', function(e, o) {
+      if (!e && o) {
+        restoreDatabase(o);
+      }
+      return inflate(null, function() {
+        return deleteKeys(function() {
+          return saveDatabase(function() {
+            console.log("ndxdb v" + version + " ready");
+            return syncCallback('ready', database);
+          });
+        });
+      }, storage.getOld);
 
       /*
       setInterval ->
@@ -213,13 +241,7 @@
             maintenanceMode = false
       , 11 * 60 * 60 * 1000
        */
-    } else {
-      maintenanceMode = false;
-      return setImmediate(function() {
-        console.log("ndxdb v" + version + " ready");
-        return syncCallback('ready', database);
-      });
-    }
+    });
   };
 
   exec = function(sql, props, notCritical, isServer, cb) {
@@ -580,8 +602,14 @@
         keyU = underscored(key).toUpperCase();
         settings[keyU] = config[key] || config[keyU] || settings[keyU];
       }
+      settings.AWS_BUCKET = settings.AWS_BUCKET || process.env.AWS_BUCKET;
+      settings.AWS_ID = settings.AWS_ID || process.env.AWS_ID;
+      settings.AWS_KEY = settings.AWS_KEY || process.env.AWS_KEY;
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
-      settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE || 100;
+      settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE || process.env.MAX_SQL_CACHE_SIZE || 100;
+      settings.ENCRYPTION_KEY = settings.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+      settings.DO_NOT_ENCRYPT = settings.DO_NOT_ENCRYPT || process.env.DO_NOT_ENCRYPT;
+      storage = require('./storage')();
       storage.checkDataDir();
       return this;
     },

@@ -36,4 +36,4 @@
 
 }).call(this);
 
-//# sourceMappingURL=test.js.map
+//# sourceMappingURL=basic.js.map

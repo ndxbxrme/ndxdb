@@ -43,9 +43,9 @@ module.exports = ->
   del: (key, cb) ->
     try
       fs.unlinkSync path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
-    #catch e
-    #  console.log "delete error #{e}"
-    cb? null, null
+      cb? null, null
+    catch e
+      cb? e, null
   put: (key, o, cb) ->
     uri = path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
     fs.writeFile uri, JSON.stringify(o), (e) ->
@@ -58,3 +58,8 @@ module.exports = ->
       catch e
         return cb?(e or 'error', null)
       cb? e, d
+  getReadStream: (key) ->
+    fs.createReadStream path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
+  getWriteStream: (key, errorCb) ->
+    uri = path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
+    fs.createWriteStream uri

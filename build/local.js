@@ -65,10 +65,14 @@
         });
       },
       del: function(key, cb) {
+        var e, error;
         try {
           fs.unlinkSync(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
-        } catch (undefined) {}
-        return typeof cb === "function" ? cb(null, null) : void 0;
+          return typeof cb === "function" ? cb(null, null) : void 0;
+        } catch (error) {
+          e = error;
+          return typeof cb === "function" ? cb(e, null) : void 0;
+        }
       },
       put: function(key, o, cb) {
         var uri;
@@ -89,6 +93,14 @@
           }
           return typeof cb === "function" ? cb(e, d) : void 0;
         });
+      },
+      getReadStream: function(key) {
+        return fs.createReadStream(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
+      },
+      getWriteStream: function(key, errorCb) {
+        var uri;
+        uri = path.join(settings.LOCAL_STORAGE, clean(key) + '.json');
+        return fs.createWriteStream(uri);
       }
     };
   };

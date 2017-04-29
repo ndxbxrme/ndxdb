@@ -1,18 +1,21 @@
 (function() {
   'use strict';
-  var AWS, settings;
+  var AWS, settings, stream;
 
   settings = require('./settings');
 
   AWS = require('aws-sdk');
 
+  stream = require('stream');
+
   module.exports = function() {
-    var S3;
+    var S3, s3Stream;
     AWS.config.bucket = settings.AWS_BUCKET;
     AWS.config.region = settings.AWS_REGION;
     AWS.config.accessKeyId = settings.AWS_ID;
     AWS.config.secretAccessKey = settings.AWS_KEY;
     S3 = new AWS.S3();
+    s3Stream = require('s3-upload-stream')(S3);
     return {
       dbs: function(cb) {
         return S3.listBuckets({}, function(e, r) {
@@ -74,6 +77,22 @@
           }
           return typeof cb === "function" ? cb(null, d) : void 0;
         });
+      },
+      getReadStream: function(key) {
+        var m;
+        m = {
+          Bucket: AWS.config.bucket,
+          Key: key
+        };
+        return S3.getObject(m).createReadStream();
+      },
+      getWriteStream: function(key) {
+        var upload;
+        upload = s3Stream.upload({
+          Bucket: AWS.config.bucket,
+          Key: key
+        });
+        return upload;
       }
     };
   };
