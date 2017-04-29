@@ -100,7 +100,7 @@
 
   asyncCallback = function(name, obj, cb) {
     var truth;
-    truth = false;
+    truth = true;
     if (callbacks[name] && callbacks[name].length) {
       return async.eachSeries(callbacks[name], function(cbitem, callback) {
         return cbitem(obj, function(result) {

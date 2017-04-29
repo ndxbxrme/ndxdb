@@ -54,7 +54,7 @@ syncCallback = (name, obj, cb) ->
       truth = truth and callback obj
   cb? truth
 asyncCallback = (name, obj, cb) ->
-  truth = false
+  truth = true
   if callbacks[name] and callbacks[name].length
     async.eachSeries callbacks[name], (cbitem, callback) ->
       cbitem obj, (result) ->
