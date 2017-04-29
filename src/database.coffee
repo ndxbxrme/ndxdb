@@ -48,18 +48,22 @@ getIdField = (row) ->
   else if row.i then output = 'i'
   output
 syncCallback = (name, obj, cb) ->
+  truth = true
   if callbacks[name] and callbacks[name].length
     for callback in callbacks[name]
-      callback obj
-  cb?()
+      truth = truth and callback obj
+  cb? truth
 asyncCallback = (name, obj, cb) ->
+  truth = true
   if callbacks[name] and callbacks[name].length
     async.eachSeries callbacks[name], (cbitem, callback) ->
-      cbitem obj, callback
+      cbitem obj, (result) ->
+        truth = truth and result
+        callback()
     , ->
-      cb?()
+      cb? truth
   else
-    cb?()
+    cb? truth
 deleteKeys = (cb) ->
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if not e and r and r.Contents
@@ -126,9 +130,9 @@ attachDatabase = ->
       console.log "ndxdb v#{version} ready"
       syncCallback 'ready', database
 upgradeDatabase = ->
-  console.log 'upgrading database'
   storage.getOld settings.DATABASE + ':database', (e, o) ->
     if not e and o
+      console.log 'upgrading database'
       restoreDatabase o, ->
         inflate null, ->
           deleteKeys ->
@@ -136,6 +140,13 @@ upgradeDatabase = ->
               console.log "ndxdb v#{version} ready"
               syncCallback 'ready', database
         , storage.getOld
+    else
+      console.log 'building new database'
+      inflate null, ->
+        deleteKeys ->
+          saveDatabase ->
+            console.log "ndxdb v#{version} ready"
+            syncCallback 'ready', database
 restoreFromBackup = (readStream) ->
   maintenanceMode = true
   storage.get '', (e, o) ->
@@ -302,7 +313,9 @@ select = (table, args, cb, isServer) ->
       table: table
       args: args
       user: user
-    , ->
+    , (result) ->
+      if not result
+        return cb? [], 0
       args = args or {}
       where = makeWhere if args.where then args.where else args
       sorting = ''
@@ -349,7 +362,9 @@ update = (table, obj, whereObj, cb, isServer) ->
       obj: obj
       where: whereObj
       user: user
-    , ->
+    , (result) ->
+      if not result
+        return cb? []
       updateSql = []
       updateProps = []
       where = makeWhere whereObj
@@ -369,7 +384,9 @@ insert = (table, obj, cb, isServer) ->
       table: table
       obj: obj
       user: user
-    , ->
+    , (result) ->
+      if not result
+        return cb? []
       if Object.prototype.toString.call(obj) is '[object Array]'
         exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
       else
@@ -393,7 +410,9 @@ del = (table, whereObj, cb, isServer) ->
       table: table
       where: whereObj
       user: user
-    , ->
+    , (result) ->
+      if not result
+        cb? []
       exec "DELETE FROM #{table}#{where.sql}", where.props, null, isServer, cb
   )(ndx.user)  
 

@@ -6,7 +6,7 @@
     tables: ['users', 'properties', 'progressions', 'emailtemplates', 'smstemplates', 'dashboard'],
     autoId: '_id',
     localStorage: './data',
-    doNotEncrypt: true
+    doNotEncrypt: false
   }).on('ready', function() {
     var result, vals;
     vals = [

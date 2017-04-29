@@ -86,26 +86,32 @@
   };
 
   syncCallback = function(name, obj, cb) {
-    var callback, j, len, ref;
+    var callback, j, len, ref, truth;
+    truth = true;
     if (callbacks[name] && callbacks[name].length) {
       ref = callbacks[name];
       for (j = 0, len = ref.length; j < len; j++) {
         callback = ref[j];
-        callback(obj);
+        truth = truth && callback(obj);
       }
     }
-    return typeof cb === "function" ? cb() : void 0;
+    return typeof cb === "function" ? cb(truth) : void 0;
   };
 
   asyncCallback = function(name, obj, cb) {
+    var truth;
+    truth = true;
     if (callbacks[name] && callbacks[name].length) {
       return async.eachSeries(callbacks[name], function(cbitem, callback) {
-        return cbitem(obj, callback);
+        return cbitem(obj, function(result) {
+          truth = truth && result;
+          return callback();
+        });
       }, function() {
-        return typeof cb === "function" ? cb() : void 0;
+        return typeof cb === "function" ? cb(truth) : void 0;
       });
     } else {
-      return typeof cb === "function" ? cb() : void 0;
+      return typeof cb === "function" ? cb(truth) : void 0;
     }
   };
 
@@ -216,9 +222,9 @@
   };
 
   upgradeDatabase = function() {
-    console.log('upgrading database');
     return storage.getOld(settings.DATABASE + ':database', function(e, o) {
       if (!e && o) {
+        console.log('upgrading database');
         return restoreDatabase(o, function() {
           return inflate(null, function() {
             return deleteKeys(function() {
@@ -228,6 +234,16 @@
               });
             });
           }, storage.getOld);
+        });
+      } else {
+        console.log('building new database');
+        return inflate(null, function() {
+          return deleteKeys(function() {
+            return saveDatabase(function() {
+              console.log("ndxdb v" + version + " ready");
+              return syncCallback('ready', database);
+            });
+          });
         });
       }
     });
@@ -465,8 +481,11 @@
         table: table,
         args: args,
         user: user
-      }, function() {
+      }, function(result) {
         var myCb, output, sorting, where;
+        if (!result) {
+          return typeof cb === "function" ? cb([], 0) : void 0;
+        }
         args = args || {};
         where = makeWhere(args.where ? args.where : args);
         sorting = '';
@@ -532,8 +551,11 @@
         obj: obj,
         where: whereObj,
         user: user
-      }, function() {
+      }, function(result) {
         var key, props, updateProps, updateSql, where;
+        if (!result) {
+          return typeof cb === "function" ? cb([]) : void 0;
+        }
         updateSql = [];
         updateProps = [];
         where = makeWhere(whereObj);
@@ -559,7 +581,10 @@
         table: table,
         obj: obj,
         user: user
-      }, function() {
+      }, function(result) {
+        if (!result) {
+          return typeof cb === "function" ? cb([]) : void 0;
+        }
         if (Object.prototype.toString.call(obj) === '[object Array]') {
           return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
         } else {
@@ -594,7 +619,12 @@
         table: table,
         where: whereObj,
         user: user
-      }, function() {
+      }, function(result) {
+        if (!result) {
+          if (typeof cb === "function") {
+            cb([]);
+          }
+        }
         return exec("DELETE FROM " + table + where.sql, where.props, null, isServer, cb);
       });
     })(ndx.user);
