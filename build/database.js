@@ -105,7 +105,7 @@
       return async.eachSeries(callbacks[name], function(cbitem, callback) {
         if (!truth) {
           return cbitem(obj, function(result) {
-            truth = truth && result;
+            truth = truth || result;
             return callback();
           });
         } else {
