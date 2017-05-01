@@ -226,6 +226,7 @@ exec = (sql, props, notCritical, isServer, cb) ->
             id: getId r
             table: table
             obj: delObj
+            user: ndx.user
             isServer: isServer
           callback()
     else if isInsert
@@ -239,6 +240,7 @@ exec = (sql, props, notCritical, isServer, cb) ->
             table: table
             obj: prop
             args: args
+            user: ndx.user
             isServer: isServer
       else
         if settings.AUTO_DATE
@@ -248,6 +250,7 @@ exec = (sql, props, notCritical, isServer, cb) ->
           id: getId props[0]
           table: table
           obj: props[0]
+          user: ndx.user
           args: args
           isServer: isServer
   output = database.exec sql, props, cb   
@@ -264,6 +267,7 @@ exec = (sql, props, notCritical, isServer, cb) ->
           table: updateId.ndxtable
           obj: r
           args: args
+          user: ndx.user
           isServer: isServer
       callback()
   if error
@@ -337,6 +341,7 @@ select = (table, args, cb, isServer) ->
             args.pageSize = args.pageSize or 10
             output = output.splice (args.page - 1) * args.pageSize, args.pageSize
           cb? output, total
+      ndx.user = user
       output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  myCb
   )(ndx.user)
 count = (table, whereObj, cb, isServer) ->
@@ -374,6 +379,7 @@ update = (table, obj, whereObj, cb, isServer) ->
           updateSql.push " `#{key}`=? "
           updateProps.push obj[key]
       props = updateProps.concat where.props
+      ndx.user = user
       exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, isServer, cb
   )(ndx.user)
 insert = (table, obj, cb, isServer) ->
@@ -386,6 +392,7 @@ insert = (table, obj, cb, isServer) ->
     , (result) ->
       if not result
         return cb? []
+      ndx.user = user
       if Object.prototype.toString.call(obj) is '[object Array]'
         exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
       else
@@ -412,6 +419,7 @@ del = (table, whereObj, cb, isServer) ->
     , (result) ->
       if not result
         cb? []
+      ndx.user = user
       exec "DELETE FROM #{table}#{where.sql}", where.props, null, isServer, cb
   )(ndx.user)  
 

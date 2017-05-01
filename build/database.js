@@ -364,6 +364,7 @@
               id: getId(r),
               table: table,
               obj: delObj,
+              user: ndx.user,
               isServer: isServer
             });
             return callback();
@@ -383,6 +384,7 @@
               table: table,
               obj: prop,
               args: args,
+              user: ndx.user,
               isServer: isServer
             });
           }
@@ -395,6 +397,7 @@
             id: getId(props[0]),
             table: table,
             obj: props[0],
+            user: ndx.user,
             args: args,
             isServer: isServer
           });
@@ -417,6 +420,7 @@
             table: updateId.ndxtable,
             obj: r,
             args: args,
+            user: ndx.user,
             isServer: isServer
           });
         }
@@ -514,6 +518,7 @@
             return typeof cb === "function" ? cb(output, total) : void 0;
           });
         };
+        ndx.user = user;
         return output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, myCb);
       });
     })(ndx.user);
@@ -568,6 +573,7 @@
           }
         }
         props = updateProps.concat(where.props);
+        ndx.user = user;
         return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, isServer, cb);
       });
     })(ndx.user);
@@ -584,6 +590,7 @@
         if (!result) {
           return typeof cb === "function" ? cb([]) : void 0;
         }
+        ndx.user = user;
         if (Object.prototype.toString.call(obj) === '[object Array]') {
           return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
         } else {
@@ -624,6 +631,7 @@
             cb([]);
           }
         }
+        ndx.user = user;
         return exec("DELETE FROM " + table + where.sql, where.props, null, isServer, cb);
       });
     })(ndx.user);
