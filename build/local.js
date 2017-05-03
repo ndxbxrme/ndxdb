@@ -53,7 +53,7 @@
               });
               count++;
             } else {
-              if (r[i] === from + '.json') {
+              if (unclean(r[i]) === from + '.json') {
                 gotFrom = true;
               }
             }

@@ -35,7 +35,7 @@ module.exports = ->
             Key: unclean r[i].replace('.json', '')
           count++
         else
-          if r[i] is from + '.json'
+          if unclean(r[i]) is from + '.json'
             gotFrom = true
       if i < r.length
         output.IsTruncated = true
