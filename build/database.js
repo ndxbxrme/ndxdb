@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, restoreFromBackup, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upgradeDatabase, upsert, version;
+  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, restoreFromBackup, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -637,6 +637,22 @@
     })(ndx.user);
   };
 
+  consolidate = function() {
+    return deleteKeys(function() {
+      return saveDatabase();
+    });
+  };
+
+  consolidateCheck = function() {
+    return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
+      if (r.Contents && r.Contents.length > (+settings.CONSOLIDATE_COUNT || 500)) {
+        return consolidate();
+      }
+    });
+  };
+
+  setInterval(consolidateCheck, (+settings.CONSOLIDATE_MINS || 60) * 60 * 1000);
+
   module.exports = {
     config: function(config) {
       var key, keyU;
@@ -717,11 +733,7 @@
     },
     saveDatabase: saveDatabase,
     restoreFromBackup: restoreFromBackup,
-    consolidate: function() {
-      return deleteKeys(function() {
-        return saveDatabase();
-      });
-    },
+    consolidate: consolidate,
     uploadDatabase: function(cb) {
       return deleteKeys(function() {
         return storage.put(settings.DATABASE + ':database', database.tables, function(e) {

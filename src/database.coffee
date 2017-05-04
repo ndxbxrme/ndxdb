@@ -422,6 +422,15 @@ del = (table, whereObj, cb, isServer) ->
       ndx.user = user
       exec "DELETE FROM #{table}#{where.sql}", where.props, null, isServer, cb
   )(ndx.user)  
+consolidate = ->
+  deleteKeys ->
+    saveDatabase()
+consolidateCheck = ->
+  storage.keys null, settings.DATABASE + ':node:', (e, r) ->
+    if r.Contents and r.Contents.length > (+settings.CONSOLIDATE_COUNT or 500)
+      consolidate()
+setInterval consolidateCheck, (+settings.CONSOLIDATE_MINS or 60) * 60 * 1000
+
 
 module.exports =
   config: (config) ->
@@ -487,9 +496,7 @@ module.exports =
     database.sqlCacheSize
   saveDatabase: saveDatabase
   restoreFromBackup: restoreFromBackup
-  consolidate: ->
-    deleteKeys ->
-      saveDatabase()
+  consolidate: consolidate
   uploadDatabase: (cb) ->
     deleteKeys ->
       storage.put settings.DATABASE + ':database', database.tables, (e) ->
