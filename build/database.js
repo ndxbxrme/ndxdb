@@ -234,7 +234,7 @@
             });
           }, storage.getOld);
         });
-      } else {
+      } else if (e === 'ENOENT') {
         console.log('building new database');
         return inflate(null, function() {
           return deleteKeys(function() {
@@ -244,6 +244,8 @@
             });
           });
         });
+      } else {
+        return console.log('\nerror decrypting database.  \nif you have changed the encryption key and want to save your data use ndx-framework to upgrade the database otherwise delete the data directory and restart the app');
       }
     });
   };

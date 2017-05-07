@@ -85,6 +85,9 @@
         return fs.readFile(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'), 'utf8', function(e, r) {
           var d, error;
           d = null;
+          if (e && e.code && e.code === 'ENOENT') {
+            return typeof cb === "function" ? cb('ENOENT', null) : void 0;
+          }
           try {
             d = JSON.parse(r);
           } catch (error) {

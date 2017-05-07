@@ -53,6 +53,8 @@ module.exports = ->
   get: (key, cb) ->
     fs.readFile path.join(settings.LOCAL_STORAGE, clean(key) + '.json'), 'utf8', (e, r) ->
       d = null
+      if e and e.code and e.code is 'ENOENT'
+        return cb? 'ENOENT', null
       try
         d = JSON.parse r
       catch e
