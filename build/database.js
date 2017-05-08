@@ -668,6 +668,7 @@
       settings.AWS_OK = settings.AWS_BUCKET && settings.AWS_ID && settings.AWS_KEY;
       settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE || process.env.MAX_SQL_CACHE_SIZE || 100;
       settings.ENCRYPTION_KEY = settings.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+      settings.ENCRYPTION_ALGORITHM = settings.ENCRYPTION_ALGORITHM || process.env.ENCRYPTION_ALGORITHM;
       settings.DO_NOT_ENCRYPT = settings.DO_NOT_ENCRYPT || process.env.DO_NOT_ENCRYPT;
       storage = require('./storage')();
       storage.checkDataDir();

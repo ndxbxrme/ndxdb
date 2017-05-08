@@ -7,9 +7,9 @@ jsonStream = require 'JSONStream'
 es = require 'event-stream'
 zlib = require 'zlib'
 
-algorithm = 'aes-256-ctr'
 
 module.exports = ->
+  algorithm = settings.ENCRYPTION_ALGORITHM or 'aes-256-ctr'
   doencrypt = !settings.DO_NOT_ENCRYPT
   dozip = !settings.DO_NOT_ENCRYPT
   s3 = require('./s3')()

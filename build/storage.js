@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var algorithm, async, crypto, es, jsonStream, settings, zlib;
+  var async, crypto, es, jsonStream, settings, zlib;
 
   settings = require('./settings');
 
@@ -14,10 +14,9 @@
 
   zlib = require('zlib');
 
-  algorithm = 'aes-256-ctr';
-
   module.exports = function() {
-    var devices, doencrypt, dozip, local, s3;
+    var algorithm, devices, doencrypt, dozip, local, s3;
+    algorithm = settings.ENCRYPTION_ALGORITHM || 'aes-256-ctr';
     doencrypt = !settings.DO_NOT_ENCRYPT;
     dozip = !settings.DO_NOT_ENCRYPT;
     s3 = require('./s3')();

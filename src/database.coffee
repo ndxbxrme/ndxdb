@@ -445,6 +445,7 @@ module.exports =
     settings.AWS_OK = settings.AWS_BUCKET and settings.AWS_ID and settings.AWS_KEY
     settings.MAX_SQL_CACHE_SIZE = settings.MAX_SQL_CACHE_SIZE or process.env.MAX_SQL_CACHE_SIZE or 100
     settings.ENCRYPTION_KEY = settings.ENCRYPTION_KEY or process.env.ENCRYPTION_KEY
+    settings.ENCRYPTION_ALGORITHM = settings.ENCRYPTION_ALGORITHM or process.env.ENCRYPTION_ALGORITHM
     settings.DO_NOT_ENCRYPT = settings.DO_NOT_ENCRYPT or process.env.DO_NOT_ENCRYPT
     storage = require('./storage')()
     storage.checkDataDir()
