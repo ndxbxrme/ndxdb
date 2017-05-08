@@ -429,7 +429,7 @@ consolidate = ->
     saveDatabase()
 consolidateCheck = ->
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
-    if r.Contents and r.Contents.length > (+settings.CONSOLIDATE_COUNT or 500)
+    if r and r.Contents and r.Contents.length > (+settings.CONSOLIDATE_COUNT or 500)
       consolidate()
 setInterval consolidateCheck, (+settings.CONSOLIDATE_MINS or 60) * 60 * 1000
 

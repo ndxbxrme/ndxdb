@@ -647,7 +647,7 @@
 
   consolidateCheck = function() {
     return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
-      if (r.Contents && r.Contents.length > (+settings.CONSOLIDATE_COUNT || 500)) {
+      if (r && r.Contents && r.Contents.length > (+settings.CONSOLIDATE_COUNT || 500)) {
         return consolidate();
       }
     });
