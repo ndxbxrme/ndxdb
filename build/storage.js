@@ -72,7 +72,7 @@
           return typeof cb === "function" ? cb(null, null) : void 0;
         } else {
           if (key.indexOf(':node:') !== -1) {
-            key = key + ":" + (new Date().valueOf());
+            key = "" + key;
           }
           jsStringify = new jsonStream.stringify();
           encrypt = crypto.createCipher(algorithm, settings.ENCRYPTION_KEY || settings.SESSION_SECRET || '5random7493nonsens!e');

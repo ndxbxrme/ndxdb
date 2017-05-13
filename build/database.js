@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, camelize, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, humanize, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, restoreFromBackup, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, underscored, update, upgradeDatabase, upsert, version;
+  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -18,11 +18,7 @@
 
   storage = null;
 
-  underscored = require('underscore.string').underscored;
-
-  humanize = require('underscore.string').humanize;
-
-  camelize = require('underscore.string').camelize;
+  s = require('underscore.string');
 
   version = require('../package.json').version;
 
@@ -659,7 +655,7 @@
     config: function(config) {
       var key, keyU;
       for (key in config) {
-        keyU = underscored(key).toUpperCase();
+        keyU = s(key).underscored().value().toUpperCase();
         settings[keyU] = config[key] || config[keyU] || settings[keyU];
       }
       settings.AWS_BUCKET = settings.AWS_BUCKET || process.env.AWS_BUCKET;
@@ -754,7 +750,20 @@
       ndx = _ndx;
       return this;
     },
-    alasql: alasql
+    alasql: alasql,
+    makeSlug: function(table, template, data, cb) {
+      var slug;
+      slug = s(ndx.fillTemplate(template, data)).prune(30, '').slugify().value();
+      return this.select(table, {
+        slug: slug
+      }, function(results) {
+        if (results.length) {
+          slug = slug + Math.floor(Math.random() * 9999);
+        }
+        data.slug = slug;
+        return typeof cb === "function" ? cb() : void 0;
+      });
+    }
   };
 
 }).call(this);

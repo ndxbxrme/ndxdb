@@ -8,9 +8,7 @@ ObjectID = require 'bson-objectid'
 objtrans = require 'objtrans'
 settings = require './settings'
 storage = null
-underscored = require('underscore.string').underscored
-humanize = require('underscore.string').humanize
-camelize = require('underscore.string').camelize
+s = require('underscore.string')
 version = require('../package.json').version
 database = null
 ndx = {}
@@ -437,7 +435,7 @@ setInterval consolidateCheck, (+settings.CONSOLIDATE_MINS or 60) * 60 * 1000
 module.exports =
   config: (config) ->
     for key of config
-      keyU = underscored(key).toUpperCase()
+      keyU = s(key).underscored().value().toUpperCase()
       settings[keyU] = config[key] or config[keyU] or settings[keyU]
     settings.AWS_BUCKET = settings.AWS_BUCKET or process.env.AWS_BUCKET
     settings.AWS_ID = settings.AWS_ID or process.env.AWS_ID
@@ -512,3 +510,12 @@ module.exports =
     ndx = _ndx
     @
   alasql: alasql
+  makeSlug: (table, template, data, cb) ->
+    slug = s(ndx.fillTemplate(template, data)).prune(30, '').slugify().value()
+    @select table,
+      slug: slug
+    , (results) ->
+      if results.length
+        slug = slug + Math.floor(Math.random() * 9999)
+      data.slug = slug
+      cb?()

@@ -47,7 +47,7 @@ module.exports = ->
       cb? null, null
     else
       if key.indexOf(':node:') isnt -1
-        key = "#{key}:#{new Date().valueOf()}"
+        key = "#{key}"
       jsStringify = new jsonStream.stringify()
       encrypt = crypto.createCipher algorithm, settings.ENCRYPTION_KEY or settings.SESSION_SECRET or '5random7493nonsens!e'
       gzip = zlib.createGzip()
