@@ -460,16 +460,16 @@
         } else if (key === '$neq') {
           sql += parse(obj[key], op, '!=');
         } else if (key === '$like') {
-          sql += " " + op + " " + (parent.replace('->', '')) + " LIKE '%" + obj[key] + "%'";
+          sql += " " + op + " " + (parent.replace(/->$/, '')) + " LIKE '%" + obj[key] + "%'";
           parent = '';
         } else if (key === '$null') {
-          sql += " " + op + " " + (parent.replace('->', '')) + " IS NULL";
+          sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NULL";
           parent = '';
         } else if (key === '$nnull') {
-          sql += " " + op + " " + (parent.replace('->', '')) + " IS NOT NULL";
+          sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NOT NULL";
           parent = '';
         } else if (key === '$nn') {
-          sql += " " + op + " " + (parent.replace('->', '')) + " IS NOT NULL";
+          sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NOT NULL";
           parent = '';
         } else if (Object.prototype.toString.call(obj[key]) === '[object Object]') {
           parent += key + '->';

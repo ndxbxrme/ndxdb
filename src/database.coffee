@@ -298,16 +298,16 @@ makeWhere = (whereObj) ->
       else if key is '$neq'
         sql += parse obj[key], op, '!='
       else if key is '$like'
-        sql += " #{op} #{parent.replace('->', '')} LIKE '%#{obj[key]}%'"
+        sql += " #{op} #{parent.replace(/->$/, '')} LIKE '%#{obj[key]}%'"
         parent = ''
       else if key is '$null'
-        sql += " #{op} #{parent.replace('->', '')} IS NULL"
+        sql += " #{op} #{parent.replace(/->$/, '')} IS NULL"
         parent = ''
       else if key is '$nnull'
-        sql += " #{op} #{parent.replace('->', '')} IS NOT NULL"
+        sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
         parent = ''
       else if key is '$nn'
-        sql += " #{op} #{parent.replace('->', '')} IS NOT NULL"
+        sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
         parent = ''
       else if Object::toString.call(obj[key]) is '[object Object]'
         parent += key + '->'
