@@ -155,6 +155,26 @@ see [ndx-permissions](https://github.com/ndxbxrme/ndx-permissions) and [ndx-prof
 
 Unregister a callback
 
+#### `db.select(string table, object whereObj, function callback)`
+
+Select data  
+
+#### `db.insert(string table, object insertObj, function callback)`
+
+Insert data
+
+#### `db.update(string table, object updateObj, object whereObj, function callback)`
+
+Update data
+
+#### `db.upsert(string table, object upsertObj, object whereObj, function callback)`
+
+Upsert data
+
+#### `db.delete(string table, object whereObj, function callback)`
+
+Delete data  
+
 #### `db.exec(string sql, array props, bool notCritical) -> data`
 
 Execute an SQL command
