@@ -774,7 +774,7 @@
           slug = slug + Math.floor(Math.random() * 9999);
         }
         data.slug = slug;
-        return typeof cb === "function" ? cb() : void 0;
+        return typeof cb === "function" ? cb(true) : void 0;
       });
     }
   };

@@ -531,4 +531,4 @@ module.exports =
       if results.length
         slug = slug + Math.floor(Math.random() * 9999)
       data.slug = slug
-      cb?()
+      cb? true
