@@ -313,7 +313,8 @@ makeWhere = (whereObj) ->
         parent += key + '->'
         sql += parse(obj[key], op, comp)
       else
-        sql += " #{op} #{parent}#{key} #{comp} ?"
+        fullKey = "#{parent}#{key}".replace /\./g, '->'
+        sql += " #{op} #{fullKey} #{comp} ?"
         props.push obj[key]
         parent = ''
     sql
