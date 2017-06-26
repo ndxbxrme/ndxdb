@@ -656,14 +656,13 @@
   };
 
   consolidateCheck = function() {
+    console.log('consolidating');
     return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
       if (r && r.Contents && r.Contents.length > (+settings.CONSOLIDATE_COUNT || 500)) {
         return consolidate();
       }
     });
   };
-
-  setInterval(consolidateCheck, (+settings.CONSOLIDATE_MINS || 60) * 60 * 1000);
 
   module.exports = {
     config: function(config) {
@@ -686,6 +685,7 @@
     },
     start: function() {
       attachDatabase();
+      setInterval(consolidateCheck, (+settings.CONSOLIDATE_MINS || 60) * 60 * 1000);
       return this;
     },
     on: function(name, callback) {
