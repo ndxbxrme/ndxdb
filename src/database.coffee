@@ -527,10 +527,21 @@ module.exports =
   alasql: alasql
   makeSlug: (table, template, data, cb) ->
     slug = s(ndx.fillTemplate(template, data)).prune(30, '').slugify().value()
-    @select table,
-      slug: slug
-    , (results) ->
-      if results.length
-        slug = slug + Math.floor(Math.random() * 9999)
+    if data.slug and data.slug.indexOf(slug) is 0
+      return cb true
+    testSlug = slug
+    outSlug = null
+    async.whilst ->
+      outSlug is null
+    , (callback) =>
+      @select table,
+        slug: testSlug
+      , (results) ->
+        if results and results.length
+          testSlug = slug + '-' + Math.floor(Math.random() * 9999)
+        else
+          outSlug = testSlug
+        callback null, outSlug
+    , (err, slug) ->
       data.slug = slug
       cb? true

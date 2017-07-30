@@ -766,14 +766,29 @@
     },
     alasql: alasql,
     makeSlug: function(table, template, data, cb) {
-      var slug;
+      var outSlug, slug, testSlug;
       slug = s(ndx.fillTemplate(template, data)).prune(30, '').slugify().value();
-      return this.select(table, {
-        slug: slug
-      }, function(results) {
-        if (results.length) {
-          slug = slug + Math.floor(Math.random() * 9999);
-        }
+      if (data.slug && data.slug.indexOf(slug) === 0) {
+        return cb(true);
+      }
+      testSlug = slug;
+      outSlug = null;
+      return async.whilst(function() {
+        return outSlug === null;
+      }, (function(_this) {
+        return function(callback) {
+          return _this.select(table, {
+            slug: testSlug
+          }, function(results) {
+            if (results && results.length) {
+              testSlug = slug + '-' + Math.floor(Math.random() * 9999);
+            } else {
+              outSlug = testSlug;
+            }
+            return callback(null, outSlug);
+          });
+        };
+      })(this), function(err, slug) {
         data.slug = slug;
         return typeof cb === "function" ? cb(true) : void 0;
       });
