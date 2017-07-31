@@ -318,7 +318,7 @@ makeWhere = (whereObj) ->
         props.push obj[key]
         parent = ''
     sql
-
+  delete whereObj['#']
   sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1')
   {
     sql: sql

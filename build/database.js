@@ -483,6 +483,7 @@
       }
       return sql;
     };
+    delete whereObj['#'];
     sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1');
     return {
       sql: sql,
