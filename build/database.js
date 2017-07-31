@@ -552,7 +552,7 @@
   cleanObj = function(obj) {
     var key;
     for (key in obj) {
-      if (key.indexOf('$') === 0) {
+      if (key.indexOf('$') === 0 || key === '#') {
         delete obj[key];
       }
     }

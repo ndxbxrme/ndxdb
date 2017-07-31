@@ -368,7 +368,7 @@ count = (table, whereObj, cb, isServer) ->
   0
 cleanObj = (obj) ->
   for key of obj
-    if key.indexOf('$') is 0
+    if key.indexOf('$') is 0 or key is '#'
       delete obj[key]
   return
 update = (table, obj, whereObj, cb, isServer) ->
