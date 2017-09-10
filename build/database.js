@@ -506,6 +506,7 @@
         where = makeWhere(args.where ? args.where : args);
         sorting = '';
         if (args.sort) {
+          args.sort = args.sort.replace(/\./g, '->');
           sorting += " ORDER BY " + args.sort;
           if (args.sortDir) {
             sorting += " " + args.sortDir;
