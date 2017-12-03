@@ -28,6 +28,7 @@ callbacks =
   preUpdate: []
   preSelect: []
   preDelete: []
+  selectTransform: []
   restore: []
 restoreDatabase = (data, cb) ->
   for key of data
@@ -282,21 +283,29 @@ makeWhere = (whereObj) ->
 
   parse = (obj, op, comp) ->
     sql = ''
+    writeVal = (key, comp) ->
+      fullKey = "#{parent}`#{key}`".replace /\./g, '->'
+      fullKey = fullKey.replace /->`\$[a-z]+`$/, ''
+      if obj[key] is null
+        sql += " #{op} #{fullKey} IS NULL"
+      else
+        sql += " #{op} #{fullKey} #{comp} ?"
+        props.push obj[key]
     for key of obj
       if key is '$or'
         sql += " #{op} (#{parse(obj[key], 'OR', comp)})".replace /\( OR /g, '('
       else if key is '$gt'
-        sql += parse obj[key], op, '>'
+        writeVal key, '>'
       else if key is '$lt'
-        sql += parse obj[key], op, '<'
+        writeVal key, '<'
       else if key is '$gte'
-        sql += parse obj[key], op, '>='
+        writeVal key, '>='
       else if key is '$lte'
-        sql += parse obj[key], op, '<='
+        writeVal key, '<='
       else if key is '$eq'
-        sql += parse obj[key], op, '='
+        writeVal key, '='
       else if key is '$neq'
-        sql += parse obj[key], op, '!='
+        writeVal key, '!='
       else if key is '$like'
         sql += " #{op} #{parent.replace(/->$/, '')} LIKE '%#{obj[key]}%'"
         parent = ''
@@ -313,10 +322,8 @@ makeWhere = (whereObj) ->
         parent += key + '->'
         sql += parse(obj[key], op, comp)
       else
-        fullKey = "#{parent}#{key}".replace /\./g, '->'
-        sql += " #{op} #{fullKey} #{comp} ?"
-        props.push obj[key]
-        parent = ''
+        writeVal key, comp
+    parent = ''
     sql
   delete whereObj['#']
   sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1')
@@ -355,7 +362,14 @@ select = (table, args, cb, isServer) ->
             args.page = args.page or 1
             args.pageSize = args.pageSize or 10
             output = output.splice (args.page - 1) * args.pageSize, args.pageSize
-          cb? output, total
+          asyncCallback (if isServer then 'serverSelectTransform' else 'selectTransform'),
+            table: table
+            objs: output
+            isServer: isServer
+            user: user
+          , ->
+            ndx.user = user
+            cb? output, total
       ndx.user = user
       output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  myCb
   )(ndx.user)

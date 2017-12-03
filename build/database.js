@@ -47,6 +47,7 @@
     preUpdate: [],
     preSelect: [],
     preDelete: [],
+    selectTransform: [],
     restore: []
   };
 
@@ -442,23 +443,34 @@
     props = [];
     parent = '';
     parse = function(obj, op, comp) {
-      var fullKey, key;
+      var key, writeVal;
       sql = '';
+      writeVal = function(key, comp) {
+        var fullKey;
+        fullKey = (parent + "`" + key + "`").replace(/\./g, '->');
+        fullKey = fullKey.replace(/->`\$[a-z]+`$/, '');
+        if (obj[key] === null) {
+          return sql += " " + op + " " + fullKey + " IS NULL";
+        } else {
+          sql += " " + op + " " + fullKey + " " + comp + " ?";
+          return props.push(obj[key]);
+        }
+      };
       for (key in obj) {
         if (key === '$or') {
           sql += (" " + op + " (" + (parse(obj[key], 'OR', comp)) + ")").replace(/\( OR /g, '(');
         } else if (key === '$gt') {
-          sql += parse(obj[key], op, '>');
+          writeVal(key, '>');
         } else if (key === '$lt') {
-          sql += parse(obj[key], op, '<');
+          writeVal(key, '<');
         } else if (key === '$gte') {
-          sql += parse(obj[key], op, '>=');
+          writeVal(key, '>=');
         } else if (key === '$lte') {
-          sql += parse(obj[key], op, '<=');
+          writeVal(key, '<=');
         } else if (key === '$eq') {
-          sql += parse(obj[key], op, '=');
+          writeVal(key, '=');
         } else if (key === '$neq') {
-          sql += parse(obj[key], op, '!=');
+          writeVal(key, '!=');
         } else if (key === '$like') {
           sql += " " + op + " " + (parent.replace(/->$/, '')) + " LIKE '%" + obj[key] + "%'";
           parent = '';
@@ -475,12 +487,10 @@
           parent += key + '->';
           sql += parse(obj[key], op, comp);
         } else {
-          fullKey = ("" + parent + key).replace(/\./g, '->');
-          sql += " " + op + " " + fullKey + " " + comp + " ?";
-          props.push(obj[key]);
-          parent = '';
+          writeVal(key, comp);
         }
       }
+      parent = '';
       return sql;
     };
     delete whereObj['#'];
@@ -529,7 +539,15 @@
               args.pageSize = args.pageSize || 10;
               output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
             }
-            return typeof cb === "function" ? cb(output, total) : void 0;
+            return asyncCallback((isServer ? 'serverSelectTransform' : 'selectTransform'), {
+              table: table,
+              objs: output,
+              isServer: isServer,
+              user: user
+            }, function() {
+              ndx.user = user;
+              return typeof cb === "function" ? cb(output, total) : void 0;
+            });
           });
         };
         ndx.user = user;
