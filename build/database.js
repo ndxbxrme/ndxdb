@@ -484,7 +484,7 @@
           sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NOT NULL";
           parent = '';
         } else if (Object.prototype.toString.call(obj[key]) === '[object Object]') {
-          parent += key + '->';
+          parent += '`' + key + '`->';
           sql += parse(obj[key], op, comp);
         } else {
           writeVal(key, comp);

@@ -319,7 +319,7 @@ makeWhere = (whereObj) ->
         sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
         parent = ''
       else if Object::toString.call(obj[key]) is '[object Object]'
-        parent += key + '->'
+        parent += '`' + key + '`->'
         sql += parse(obj[key], op, comp)
       else
         writeVal key, comp
