@@ -557,6 +557,7 @@ module.exports =
         else
           outSlug = testSlug
         callback null, outSlug
+      , true
     , (err, slug) ->
       data.slug = slug
       cb? true
