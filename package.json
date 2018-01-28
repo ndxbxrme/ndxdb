@@ -1,6 +1,6 @@
 {
   "name": "ndxdb",
-  "version": "1.8.16",
+  "version": "1.8.17",
   "description": "a cheap and easy in-memory sql database that persits to S3",
   "main": "build/database.js",
   "scripts": {
@@ -35,6 +35,7 @@
     "async": "^2.1.4",
     "aws-sdk": "^2.7.20",
     "bson-objectid": "^1.1.4",
+    "deep-diff": "^0.3.8",
     "event-stream": "^3.3.4",
     "glob": "^7.1.1",
     "ndx-permissions": "0.0.2",

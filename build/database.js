@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
+  var DeepDiff, ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, readDiffs, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -19,6 +19,8 @@
   storage = null;
 
   s = require('underscore.string');
+
+  DeepDiff = require('deep-diff').diff;
 
   version = require('../package.json').version;
 
@@ -129,6 +131,34 @@
         return cb();
       }
     });
+  };
+
+  readDiffs = function(from, to, out) {
+    var dif, diffs, good, j, len, myout, mypath;
+    diffs = DeepDiff(from, to);
+    out = out || {};
+    for (j = 0, len = diffs.length; j < len; j++) {
+      dif = diffs[j];
+      switch (dif.kind) {
+        case 'E':
+        case 'N':
+          myout = out;
+          mypath = dif.path.join('.');
+          good = true;
+          if (dif.lhs && dif.rhs && typeof dif.lhs !== typeof dif.rhs) {
+            if (dif.lhs.toString() === dif.rhs.toString()) {
+              good = false;
+            }
+          }
+          if (good) {
+            myout[mypath] = {};
+            myout = myout[mypath];
+            myout.from = dif.lhs;
+            myout.to = dif.rhs;
+          }
+      }
+    }
+    return out;
   };
 
   inflate = function(from, cb, getFn) {
@@ -263,7 +293,7 @@
     }, readStream);
   };
 
-  exec = function(sql, props, notCritical, isServer, cb) {
+  exec = function(sql, props, notCritical, isServer, cb, changes) {
     var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
     if (maintenanceMode) {
       if (typeof cb === "function") {
@@ -419,6 +449,7 @@
             table: updateId.ndxtable,
             obj: r,
             args: args,
+            changes: changes,
             user: ndx.user,
             isServer: isServer
           });
@@ -579,34 +610,49 @@
   };
 
   update = function(table, obj, whereObj, cb, isServer) {
+    var where;
     cleanObj(obj);
+    where = makeWhere(whereObj);
+    if (where.sql) {
+      where.sql = " WHERE " + where.sql;
+    }
     return (function(user) {
-      return asyncCallback((isServer ? 'serverPreUpdate' : 'preUpdate'), {
-        id: getId(obj),
-        table: table,
-        obj: obj,
-        where: whereObj,
-        user: user
-      }, function(result) {
-        var key, props, updateProps, updateSql, where;
-        if (!result) {
+      return exec("SELECT * FROM " + table + where.sql, where.props, null, true, function(oldItems) {
+        if (oldItems) {
+          return async.each(oldItems, function(oldItem, diffCb) {
+            var diffs, id;
+            diffs = readDiffs(oldItem, obj);
+            id = getId(oldItem);
+            return asyncCallback((isServer ? 'serverPreUpdate' : 'preUpdate'), {
+              id: id,
+              table: table,
+              obj: obj,
+              where: whereObj,
+              changes: diffs,
+              user: user
+            }, function(result) {
+              var key, updateProps, updateSql;
+              if (!result) {
+                return typeof cb === "function" ? cb([]) : void 0;
+              }
+              updateSql = [];
+              updateProps = [];
+              for (key in obj) {
+                if (where.props.indexOf(obj[key]) === -1) {
+                  updateSql.push(" `" + key + "`=? ");
+                  updateProps.push(obj[key]);
+                }
+              }
+              updateProps.push(id);
+              ndx.user = user;
+              return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + " WHERE `" + [settings.AUTO_ID] + "`= ?", updateProps, null, isServer, diffCb, diffs);
+            });
+          }, function() {
+            return typeof cb === "function" ? cb([]) : void 0;
+          });
+        } else {
           return typeof cb === "function" ? cb([]) : void 0;
         }
-        updateSql = [];
-        updateProps = [];
-        where = makeWhere(whereObj);
-        if (where.sql) {
-          where.sql = " WHERE " + where.sql;
-        }
-        for (key in obj) {
-          if (where.props.indexOf(obj[key]) === -1) {
-            updateSql.push(" `" + key + "`=? ");
-            updateProps.push(obj[key]);
-          }
-        }
-        props = updateProps.concat(where.props);
-        ndx.user = user;
-        return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + where.sql, props, null, isServer, cb);
       });
     })(ndx.user);
   };

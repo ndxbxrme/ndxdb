@@ -9,6 +9,8 @@ objtrans = require 'objtrans'
 settings = require './settings'
 storage = null
 s = require('underscore.string')
+DeepDiff = require 'deep-diff'
+.diff
 version = require('../package.json').version
 database = null
 ndx = {}
@@ -72,6 +74,24 @@ deleteKeys = (cb) ->
         deleteKeys cb
     else
       cb()
+readDiffs = (from, to, out) ->
+  diffs = DeepDiff from, to
+  out = out or {}
+  for dif in diffs
+    switch dif.kind
+      when 'E', 'N'
+        myout = out
+        mypath = dif.path.join('.')
+        good = true
+        if dif.lhs and dif.rhs and typeof(dif.lhs) isnt typeof(dif.rhs)
+          if dif.lhs.toString() is dif.rhs.toString()
+            good = false
+        if good
+          myout[mypath] ={}
+          myout = myout[mypath]
+          myout.from = dif.lhs
+          myout.to = dif.rhs
+  out
 inflate = (from, cb, getFn) ->
   if not getFn
     getFn = storage.get
@@ -157,7 +177,7 @@ restoreFromBackup = (readStream) ->
             console.log "backup restored"
             syncCallback 'restore', null
   , readStream
-exec = (sql, props, notCritical, isServer, cb) ->
+exec = (sql, props, notCritical, isServer, cb, changes) ->
   if maintenanceMode
     cb? []
     return []
@@ -268,6 +288,7 @@ exec = (sql, props, notCritical, isServer, cb) ->
           table: updateId.ndxtable
           obj: r
           args: args
+          changes: changes
           user: ndx.user
           isServer: isServer
       callback()
@@ -388,28 +409,38 @@ cleanObj = (obj) ->
   return
 update = (table, obj, whereObj, cb, isServer) ->
   cleanObj obj
+  where = makeWhere whereObj
+  if where.sql
+    where.sql = " WHERE #{where.sql}"
   ((user) ->
-    asyncCallback (if isServer then 'serverPreUpdate' else 'preUpdate'),
-      id: getId obj
-      table: table
-      obj: obj
-      where: whereObj
-      user: user
-    , (result) ->
-      if not result
-        return cb? []
-      updateSql = []
-      updateProps = []
-      where = makeWhere whereObj
-      if where.sql
-        where.sql = " WHERE #{where.sql}"
-      for key of obj
-        if where.props.indexOf(obj[key]) is -1
-          updateSql.push " `#{key}`=? "
-          updateProps.push obj[key]
-      props = updateProps.concat where.props
-      ndx.user = user
-      exec "UPDATE #{table} SET #{updateSql.join(',')}#{where.sql}", props, null, isServer, cb
+    exec "SELECT * FROM #{table}#{where.sql}", where.props, null, true, (oldItems) ->
+      if oldItems
+        async.each oldItems, (oldItem, diffCb) ->
+          diffs = readDiffs oldItem, obj
+          id = getId oldItem
+          asyncCallback (if isServer then 'serverPreUpdate' else 'preUpdate'),
+            id: id
+            table: table
+            obj: obj
+            where: whereObj
+            changes: diffs
+            user: user
+          , (result) ->
+            if not result
+              return cb? []
+            updateSql = []
+            updateProps = []
+            for key of obj
+              if where.props.indexOf(obj[key]) is -1
+                updateSql.push " `#{key}`=? "
+                updateProps.push obj[key]
+            updateProps.push id
+            ndx.user = user
+            exec "UPDATE #{table} SET #{updateSql.join(',')} WHERE `#{[settings.AUTO_ID]}`= ?", updateProps, null, isServer, diffCb, diffs
+        , ->
+          cb? []
+      else
+        cb? []
   )(ndx.user)
 insert = (table, obj, cb, isServer) ->
   cleanObj obj
