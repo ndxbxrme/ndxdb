@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var DeepDiff, ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, ndx, objtrans, readDiffs, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
+  var DeepDiff, ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, maxModified, ndx, objtrans, readDiffs, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -137,25 +137,27 @@
     var dif, diffs, good, j, len, myout, mypath;
     diffs = DeepDiff(from, to);
     out = out || {};
-    for (j = 0, len = diffs.length; j < len; j++) {
-      dif = diffs[j];
-      switch (dif.kind) {
-        case 'E':
-        case 'N':
-          myout = out;
-          mypath = dif.path.join('.');
-          good = true;
-          if (dif.lhs && dif.rhs && typeof dif.lhs !== typeof dif.rhs) {
-            if (dif.lhs.toString() === dif.rhs.toString()) {
-              good = false;
+    if (diffs) {
+      for (j = 0, len = diffs.length; j < len; j++) {
+        dif = diffs[j];
+        switch (dif.kind) {
+          case 'E':
+          case 'N':
+            myout = out;
+            mypath = dif.path.join('.');
+            good = true;
+            if (dif.lhs && dif.rhs && typeof dif.lhs !== typeof dif.rhs) {
+              if (dif.lhs.toString() === dif.rhs.toString()) {
+                good = false;
+              }
             }
-          }
-          if (good) {
-            myout[mypath] = {};
-            myout = myout[mypath];
-            myout.from = dif.lhs;
-            myout.to = dif.rhs;
-          }
+            if (good) {
+              myout[mypath] = {};
+              myout = myout[mypath];
+              myout.from = dif.lhs;
+              myout.to = dif.rhs;
+            }
+        }
       }
     }
     return out;
@@ -463,6 +465,16 @@
     return output;
   };
 
+  maxModified = function(table, cb) {
+    return database.exec('SELECT MAX(modifiedAt) as maxModified FROM ' + table, null, function(result) {
+      maxModified = 0;
+      if (result && result.length) {
+        maxModified = result[0].maxModified || 0;
+      }
+      return typeof cb === "function" ? cb(maxModified) : void 0;
+    });
+  };
+
   makeWhere = function(whereObj) {
     var parent, parse, props, sql;
     if (!whereObj || whereObj.sort || whereObj.sortDir || whereObj.pageSize) {
@@ -681,6 +693,11 @@
   upsert = function(table, obj, whereObj, cb, isServer) {
     var test, where;
     where = makeWhere(whereObj);
+    if (!whereObj && obj[settings.AUTO_ID]) {
+      whereObj = {};
+      whereObj[settings.AUTO_ID] = obj[settings.AUTO_ID];
+      where = makeWhere(whereObj);
+    }
     if (where.sql) {
       where.sql = " WHERE " + where.sql;
     }
@@ -792,6 +809,7 @@
     insert: insert,
     upsert: upsert,
     "delete": del,
+    maxModified: maxModified,
     maintenanceOn: function() {
       return maintenanceMode = true;
     },

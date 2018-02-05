@@ -77,20 +77,21 @@ deleteKeys = (cb) ->
 readDiffs = (from, to, out) ->
   diffs = DeepDiff from, to
   out = out or {}
-  for dif in diffs
-    switch dif.kind
-      when 'E', 'N'
-        myout = out
-        mypath = dif.path.join('.')
-        good = true
-        if dif.lhs and dif.rhs and typeof(dif.lhs) isnt typeof(dif.rhs)
-          if dif.lhs.toString() is dif.rhs.toString()
-            good = false
-        if good
-          myout[mypath] ={}
-          myout = myout[mypath]
-          myout.from = dif.lhs
-          myout.to = dif.rhs
+  if diffs
+    for dif in diffs
+      switch dif.kind
+        when 'E', 'N'
+          myout = out
+          mypath = dif.path.join('.')
+          good = true
+          if dif.lhs and dif.rhs and typeof(dif.lhs) isnt typeof(dif.rhs)
+            if dif.lhs.toString() is dif.rhs.toString()
+              good = false
+          if good
+            myout[mypath] ={}
+            myout = myout[mypath]
+            myout.from = dif.lhs
+            myout.to = dif.rhs
   out
 inflate = (from, cb, getFn) ->
   if not getFn
@@ -295,6 +296,12 @@ exec = (sql, props, notCritical, isServer, cb, changes) ->
   if error
     output.error = error
   output
+maxModified = (table, cb) ->
+  database.exec 'SELECT MAX(modifiedAt) as maxModified FROM ' + table, null, (result) ->
+    maxModified = 0
+    if result and result.length
+      maxModified = result[0].maxModified or 0
+    cb? maxModified
 makeWhere = (whereObj) ->
   if not whereObj or whereObj.sort or whereObj.sortDir or whereObj.pageSize
     return sql: ''
@@ -460,6 +467,10 @@ insert = (table, obj, cb, isServer) ->
   )(ndx.user)
 upsert = (table, obj, whereObj, cb, isServer) ->
   where = makeWhere whereObj
+  if not whereObj and obj[settings.AUTO_ID]
+    whereObj = {}
+    whereObj[settings.AUTO_ID] = obj[settings.AUTO_ID]
+    where = makeWhere whereObj
   if where.sql
     where.sql = " WHERE #{where.sql}"
   test = exec "SELECT * FROM #{table}#{where.sql}", where.props, null, isServer
@@ -543,7 +554,7 @@ module.exports =
   insert: insert
   upsert: upsert
   delete: del
-    
+  maxModified: maxModified
   maintenanceOn: ->
     maintenanceMode = true
   maintenanceOff: ->
