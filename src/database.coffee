@@ -372,7 +372,6 @@ makeWhere = (whereObj) ->
       else
         writeVal key, comp
     parent = ''
-    console.log sql
     sql
   delete whereObj['#']
   sql = parse(whereObj, 'AND', '=').replace(/(^|\() (AND|OR) /g, '$1')

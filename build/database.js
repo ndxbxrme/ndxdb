@@ -562,7 +562,6 @@
         }
       }
       parent = '';
-      console.log(sql);
       return sql;
     };
     delete whereObj['#'];
