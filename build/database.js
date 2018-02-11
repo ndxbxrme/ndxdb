@@ -508,7 +508,6 @@
           ref = obj[key];
           for (j = 0, len = ref.length; j < len; j++) {
             thing = ref[j];
-            console.log(thing);
             objsql = parse(thing, 'AND', comp).replace(/^ AND /, '');
             if (/ AND | OR /.test(objsql) && objsql.indexOf('(') !== 0) {
               objsql = "(" + objsql + ")";
@@ -767,7 +766,6 @@
   };
 
   consolidateCheck = function() {
-    console.log('consolidating');
     return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
       if (r && r.Contents && r.Contents.length > (+settings.CONSOLIDATE_COUNT || 500)) {
         return consolidate();

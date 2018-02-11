@@ -325,7 +325,6 @@ makeWhere = (whereObj) ->
       if key is '$or'
         orsql = ''
         for thing in obj[key]
-          console.log thing
           objsql = parse(thing, 'AND', comp).replace /^ AND /, ''
           if / AND | OR /.test(objsql) and objsql.indexOf('(') isnt 0
             objsql = "(#{objsql})"
@@ -517,7 +516,6 @@ consolidate = ->
   deleteKeys ->
     saveDatabase()
 consolidateCheck = ->
-  console.log 'consolidating'
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if r and r.Contents and r.Contents.length > (+settings.CONSOLIDATE_COUNT or 500)
       consolidate()
