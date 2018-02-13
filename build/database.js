@@ -578,7 +578,7 @@
         args: args,
         user: user
       }, function(result) {
-        var myCb, output, sorting, where;
+        var bit, i, key, myCb, mykey, output, sorting, where;
         if (!result) {
           return typeof cb === "function" ? cb([], 0) : void 0;
         }
@@ -586,10 +586,27 @@
         where = makeWhere(args.where ? args.where : args);
         sorting = '';
         if (args.sort) {
-          args.sort = args.sort.replace(/\./g, '->');
-          sorting += " ORDER BY " + args.sort;
-          if (args.sortDir) {
-            sorting += " " + args.sortDir;
+          if (Object.prototype.toString.call(args.sort) === '[object Object]') {
+            sorting += ' ORDER BY ';
+            i = 0;
+            for (key in args.sort) {
+              if (i++ > 0) {
+                sorting += ', ';
+              }
+              bit = args.sort[key];
+              mykey = key.replace(/\./g, '->');
+              if (bit === 1 || bit === 'ASC') {
+                sorting += "`" + mykey + "` ASC";
+              } else {
+                sorting += "`" + mykey + "` DESC";
+              }
+            }
+          } else {
+            args.sort = args.sort.replace(/\./g, '->');
+            sorting += " ORDER BY `" + args.sort + "`";
+            if (args.sortDir) {
+              sorting += " " + args.sortDir;
+            }
           }
         }
         if (where.sql) {

@@ -391,10 +391,23 @@ select = (table, args, cb, isServer) ->
       where = makeWhere if args.where then args.where else args
       sorting = ''
       if args.sort
-        args.sort = args.sort.replace /\./g, '->'
-        sorting += " ORDER BY #{args.sort}"
-        if args.sortDir
-          sorting += " #{args.sortDir}"
+        if Object.prototype.toString.call(args.sort) is '[object Object]'
+          sorting += ' ORDER BY '
+          i = 0
+          for key of args.sort
+            if i++ > 0
+              sorting += ', '
+            bit = args.sort[key]
+            mykey = key.replace /\./g, '->'
+            if bit is 1 or bit is 'ASC'
+              sorting += "`#{mykey}` ASC"
+            else
+              sorting += "`#{mykey}` DESC"
+        else
+          args.sort = args.sort.replace /\./g, '->'
+          sorting += " ORDER BY `#{args.sort}`"
+          if args.sortDir
+            sorting += " #{args.sortDir}"
       if where.sql
         where.sql = " WHERE #{where.sql}"
       myCb = (output) ->
