@@ -461,6 +461,7 @@ update = (table, obj, whereObj, cb, isServer) ->
             id: id
             table: table
             obj: obj
+            oldObj: oldItem
             where: whereObj
             changes: diffs
             user: user
