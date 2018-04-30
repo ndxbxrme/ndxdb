@@ -322,54 +322,55 @@ makeWhere = (whereObj) ->
         sql += " #{op} #{fullKey} #{comp} ?"
         props.push obj[key]
     for key of obj
-      if key is '$or'
-        orsql = ''
-        for thing in obj[key]
-          objsql = parse(thing, 'AND', comp).replace /^ AND /, ''
-          if / AND | OR /.test(objsql) and objsql.indexOf('(') isnt 0
-            objsql = "(#{objsql})"
-          orsql += ' OR ' + objsql
-        sql += " #{op} (#{orsql})".replace /\( OR /g, '('
-      else if key is '$and'
-        andsql = ''
-        for thing in obj[key]
-          andsql += parse(thing, 'AND', comp)
-        sql += " #{op} (#{andsql})".replace /\( AND /g, '('
-      else if key is '$gt'
-        writeVal key, '>'
-      else if key is '$lt'
-        writeVal key, '<'
-      else if key is '$gte'
-        writeVal key, '>='
-      else if key is '$lte'
-        writeVal key, '<='
-      else if key is '$eq'
-        writeVal key, '='
-      else if key is '$neq'
-        writeVal key, '!='
-      else if key is '$ne'
-        writeVal key, '!='
-      else if key is '$in'
-         writeVal key, 'IN'
-      else if key is '$nin'
-         writeVal key, 'NOT IN'
-      else if key is '$like'
-        sql += " #{op} #{parent.replace(/->$/, '')} LIKE '%#{obj[key]}%'"
-        parent = ''
-      else if key is '$null'
-        sql += " #{op} #{parent.replace(/->$/, '')} IS NULL"
-        parent = ''
-      else if key is '$nnull'
-        sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
-        parent = ''
-      else if key is '$nn'
-        sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
-        parent = ''
-      else if Object::toString.call(obj[key]) is '[object Object]'
-        parent += '`' + key + '`->'
-        sql += parse(obj[key], op, comp)
-      else
-        writeVal key, comp
+      if obj.hasOwnProperty key
+        if key is '$or'
+          orsql = ''
+          for thing in obj[key]
+            objsql = parse(thing, 'AND', comp).replace /^ AND /, ''
+            if / AND | OR /.test(objsql) and objsql.indexOf('(') isnt 0
+              objsql = "(#{objsql})"
+            orsql += ' OR ' + objsql
+          sql += " #{op} (#{orsql})".replace /\( OR /g, '('
+        else if key is '$and'
+          andsql = ''
+          for thing in obj[key]
+            andsql += parse(thing, 'AND', comp)
+          sql += " #{op} (#{andsql})".replace /\( AND /g, '('
+        else if key is '$gt'
+          writeVal key, '>'
+        else if key is '$lt'
+          writeVal key, '<'
+        else if key is '$gte'
+          writeVal key, '>='
+        else if key is '$lte'
+          writeVal key, '<='
+        else if key is '$eq'
+          writeVal key, '='
+        else if key is '$neq'
+          writeVal key, '!='
+        else if key is '$ne'
+          writeVal key, '!='
+        else if key is '$in'
+           writeVal key, 'IN'
+        else if key is '$nin'
+           writeVal key, 'NOT IN'
+        else if key is '$like'
+          sql += " #{op} #{parent.replace(/->$/, '')} LIKE '%#{obj[key]}%'"
+          parent = ''
+        else if key is '$null'
+          sql += " #{op} #{parent.replace(/->$/, '')} IS NULL"
+          parent = ''
+        else if key is '$nnull'
+          sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
+          parent = ''
+        else if key is '$nn'
+          sql += " #{op} #{parent.replace(/->$/, '')} IS NOT NULL"
+          parent = ''
+        else if Object::toString.call(obj[key]) is '[object Object]'
+          parent += '`' + key + '`->'
+          sql += parse(obj[key], op, comp)
+        else
+          writeVal key, comp
     parent = ''
     sql
   delete whereObj['#']
@@ -379,60 +380,69 @@ makeWhere = (whereObj) ->
     props: props
   }
 select = (table, args, cb, isServer) ->
-  ((user) ->
-    asyncCallback (if isServer then 'serverPreSelect' else 'preSelect'), 
-      table: table
-      args: args
-      user: user
-    , (result) ->
-      if not result
-        return cb? [], 0
-      args = args or {}
-      where = makeWhere if args.where then args.where else args
-      sorting = ''
-      if args.sort
-        if Object.prototype.toString.call(args.sort) is '[object Object]'
-          sorting += ' ORDER BY '
-          i = 0
-          for key of args.sort
-            if i++ > 0
-              sorting += ', '
-            bit = args.sort[key]
-            mykey = key.replace /\./g, '->'
-            if bit is 1 or bit is 'ASC'
-              sorting += "`#{mykey}` ASC"
-            else
-              sorting += "`#{mykey}` DESC"
-        else
-          args.sort = args.sort.replace /\./g, '->'
-          sorting += " ORDER BY `#{args.sort}`"
-          if args.sortDir
-            sorting += " #{args.sortDir}"
-      if where.sql
-        where.sql = " WHERE #{where.sql}"
-      myCb = (output) ->
-        asyncCallback (if isServer then 'serverSelect' else 'select'), 
-          table: table
-          objs: output
-          isServer: isServer
-          user: user
-        , ->
-          total = output.length
-          if args.page or args.pageSize
-            args.page = args.page or 1
-            args.pageSize = args.pageSize or 10
-            output = output.splice (args.page - 1) * args.pageSize, args.pageSize
-          asyncCallback (if isServer then 'serverSelectTransform' else 'selectTransform'),
+  new Promise (resolve, reject) ->
+    ((user) ->
+      asyncCallback (if isServer then 'serverPreSelect' else 'preSelect'), 
+        table: table
+        args: args
+        user: user
+      , (result) ->
+        if not result
+          resolve []
+          return cb? [], 0
+        args = args or {}
+        where = makeWhere if args.where then args.where else args
+        sorting = ''
+        if args.sort
+          if Object.prototype.toString.call(args.sort) is '[object Object]'
+            sorting += ' ORDER BY '
+            i = 0
+            for key of args.sort
+              if i++ > 0
+                sorting += ', '
+              bit = args.sort[key]
+              mykey = key.replace /\./g, '->'
+              if bit is 1 or bit is 'ASC'
+                sorting += "`#{mykey}` ASC"
+              else
+                sorting += "`#{mykey}` DESC"
+          else
+            args.sort = args.sort.replace /\./g, '->'
+            sorting += " ORDER BY `#{args.sort}`"
+            if args.sortDir
+              sorting += " #{args.sortDir}"
+        if where.sql
+          where.sql = " WHERE #{where.sql}"
+        myCb = (output) ->
+          asyncCallback (if isServer then 'serverSelect' else 'select'), 
             table: table
             objs: output
             isServer: isServer
             user: user
           , ->
-            ndx.user = user
-            cb? output, total
-      ndx.user = user
-      output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  myCb
-  )(ndx.user)
+            total = output.length
+            if args.page or args.pageSize
+              args.page = args.page or 1
+              args.pageSize = args.pageSize or 10
+              output = output.splice (args.page - 1) * args.pageSize, args.pageSize
+            asyncCallback (if isServer then 'serverSelectTransform' else 'selectTransform'),
+              table: table
+              objs: output
+              isServer: isServer
+              user: user
+            , ->
+              ndx.user = user
+              resolve output
+              cb? output, total
+        ndx.user = user
+        output = exec "SELECT * FROM #{table}#{where.sql}#{sorting}", where.props, null, isServer,  myCb
+    )(ndx.user)
+selectOne = (table, args, cb, isServer) ->
+  output = await select table, args, null, isServer
+  if output and output.length
+    return output[0]
+  else
+    return null
 count = (table, whereObj, cb, isServer) ->
   where = makeWhere whereObj
   if where.sql
@@ -443,7 +453,7 @@ count = (table, whereObj, cb, isServer) ->
   0
 cleanObj = (obj) ->
   for key of obj
-    if key.indexOf('$') is 0 or key is '#'
+    if key.indexOf('$') is 0 or key is '#' or not obj.hasOwnProperty(key)
       delete obj[key]
   return
 update = (table, obj, whereObj, cb, isServer) ->
@@ -581,6 +591,7 @@ module.exports =
     asyncCallback type, args
   exec: exec
   select: select
+  selectOne: selectOne
   count: count
   update: update
   insert: insert

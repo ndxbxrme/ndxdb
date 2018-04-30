@@ -72,7 +72,7 @@
           return typeof cb === "function" ? cb(null, null) : void 0;
         } else {
           if (key.indexOf(':node:') !== -1) {
-            key = "" + key;
+            key = `${key}`;
           }
           jsStringify = new jsonStream.stringify();
           encrypt = crypto.createCipher(algorithm, settings.ENCRYPTION_KEY || settings.SESSION_SECRET || '5random7493nonsens!e');
@@ -117,6 +117,7 @@
           return encrypt.on('error', function(er) {});
         }
       },
+      //jsStringify.end()
       get: function(key, cb, reader) {
         var decrypt, finished, gunzip, jsParse;
         if (!devices) {

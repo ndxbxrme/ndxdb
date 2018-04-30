@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  var DeepDiff, ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, maxModified, ndx, objtrans, readDiffs, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
+  var DeepDiff, ObjectID, alasql, async, asyncCallback, attachDatabase, callbacks, cleanObj, consolidate, consolidateCheck, count, database, del, deleteKeys, exec, fs, getId, getIdField, inflate, insert, maintenanceMode, makeWhere, maxModified, ndx, objtrans, readDiffs, resetSqlCache, restoreDatabase, restoreFromBackup, s, saveDatabase, select, selectOne, settings, sqlCache, sqlCacheSize, storage, syncCallback, update, upgradeDatabase, upsert, version;
 
   fs = require('fs');
 
@@ -44,7 +44,7 @@
     insert: [],
     update: [],
     select: [],
-    "delete": [],
+    delete: [],
     preInsert: [],
     preUpdate: [],
     preSelect: [],
@@ -230,7 +230,7 @@
             return inflate(null, function() {
               return deleteKeys(function() {
                 return saveDatabase(function() {
-                  console.log("ndxdb v" + version + " ready");
+                  console.log(`ndxdb v${version} ready`);
                   return syncCallback('ready', database);
                 });
               });
@@ -243,7 +243,7 @@
     } else {
       maintenanceMode = false;
       return setImmediate(function() {
-        console.log("ndxdb v" + version + " ready");
+        console.log(`ndxdb v${version} ready`);
         return syncCallback('ready', database);
       });
     }
@@ -257,7 +257,7 @@
           return inflate(null, function() {
             return deleteKeys(function() {
               return saveDatabase(function() {
-                console.log("ndxdb v" + version + " ready");
+                console.log(`ndxdb v${version} ready`);
                 return syncCallback('ready', database);
               });
             });
@@ -268,7 +268,7 @@
         return inflate(null, function() {
           return deleteKeys(function() {
             return saveDatabase(function() {
-              console.log("ndxdb v" + version + " ready");
+              console.log(`ndxdb v${version} ready`);
               return syncCallback('ready', database);
             });
           });
@@ -489,75 +489,77 @@
       sql = '';
       writeVal = function(key, comp) {
         var fullKey;
-        fullKey = (parent + "`" + key + "`").replace(/\./g, '->');
+        fullKey = `${parent}\`${key}\``.replace(/\./g, '->');
         fullKey = fullKey.replace(/->`\$[a-z]+`$/, '');
         if (obj[key] === null) {
           if (key === '$ne' || key === '$neq') {
-            return sql += " " + op + " " + fullKey + " IS NOT NULL";
+            return sql += ` ${op} ${fullKey} IS NOT NULL`;
           } else {
-            return sql += " " + op + " " + fullKey + " IS NULL";
+            return sql += ` ${op} ${fullKey} IS NULL`;
           }
         } else {
-          sql += " " + op + " " + fullKey + " " + comp + " ?";
+          sql += ` ${op} ${fullKey} ${comp} ?`;
           return props.push(obj[key]);
         }
       };
       for (key in obj) {
-        if (key === '$or') {
-          orsql = '';
-          ref = obj[key];
-          for (j = 0, len = ref.length; j < len; j++) {
-            thing = ref[j];
-            objsql = parse(thing, 'AND', comp).replace(/^ AND /, '');
-            if (/ AND | OR /.test(objsql) && objsql.indexOf('(') !== 0) {
-              objsql = "(" + objsql + ")";
+        if (obj.hasOwnProperty(key)) {
+          if (key === '$or') {
+            orsql = '';
+            ref = obj[key];
+            for (j = 0, len = ref.length; j < len; j++) {
+              thing = ref[j];
+              objsql = parse(thing, 'AND', comp).replace(/^ AND /, '');
+              if (/ AND | OR /.test(objsql) && objsql.indexOf('(') !== 0) {
+                objsql = `(${objsql})`;
+              }
+              orsql += ' OR ' + objsql;
             }
-            orsql += ' OR ' + objsql;
+            sql += ` ${op} (${orsql})`.replace(/\( OR /g, '(');
+          } else if (key === '$and') {
+            andsql = '';
+            ref1 = obj[key];
+            for (k = 0, len1 = ref1.length; k < len1; k++) {
+              thing = ref1[k];
+              andsql += parse(thing, 'AND', comp);
+            }
+            sql += ` ${op} (${andsql})`.replace(/\( AND /g, '(');
+          } else if (key === '$gt') {
+            writeVal(key, '>');
+          } else if (key === '$lt') {
+            writeVal(key, '<');
+          } else if (key === '$gte') {
+            writeVal(key, '>=');
+          } else if (key === '$lte') {
+            writeVal(key, '<=');
+          } else if (key === '$eq') {
+            writeVal(key, '=');
+          } else if (key === '$neq') {
+            writeVal(key, '!=');
+          } else if (key === '$ne') {
+            writeVal(key, '!=');
+          } else if (key === '$in') {
+            writeVal(key, 'IN');
+          } else if (key === '$nin') {
+            writeVal(key, 'NOT IN');
+          } else if (key === '$like') {
+            sql += ` ${op} ${parent.replace(/->$/, '')} LIKE '%${obj[key]}%'`;
+            parent = '';
+          } else if (key === '$null') {
+            sql += ` ${op} ${parent.replace(/->$/, '')} IS NULL`;
+            parent = '';
+          } else if (key === '$nnull') {
+            sql += ` ${op} ${parent.replace(/->$/, '')} IS NOT NULL`;
+            parent = '';
+          } else if (key === '$nn') {
+            sql += ` ${op} ${parent.replace(/->$/, '')} IS NOT NULL`;
+            parent = '';
+          } else if (Object.prototype.toString.call(obj[key]) === '[object Object]') {
+            parent += '`' + key + '`->';
+            sql += parse(obj[key], op, comp);
+          } else {
+            writeVal(key, comp);
           }
-          sql += (" " + op + " (" + orsql + ")").replace(/\( OR /g, '(');
-        } else if (key === '$and') {
-          andsql = '';
-          ref1 = obj[key];
-          for (k = 0, len1 = ref1.length; k < len1; k++) {
-            thing = ref1[k];
-            andsql += parse(thing, 'AND', comp);
-          }
-          sql += (" " + op + " (" + andsql + ")").replace(/\( AND /g, '(');
-        } else if (key === '$gt') {
-          writeVal(key, '>');
-        } else if (key === '$lt') {
-          writeVal(key, '<');
-        } else if (key === '$gte') {
-          writeVal(key, '>=');
-        } else if (key === '$lte') {
-          writeVal(key, '<=');
-        } else if (key === '$eq') {
-          writeVal(key, '=');
-        } else if (key === '$neq') {
-          writeVal(key, '!=');
-        } else if (key === '$ne') {
-          writeVal(key, '!=');
-        } else if (key === '$in') {
-          writeVal(key, 'IN');
-        } else if (key === '$nin') {
-          writeVal(key, 'NOT IN');
-        } else if (key === '$like') {
-          sql += " " + op + " " + (parent.replace(/->$/, '')) + " LIKE '%" + obj[key] + "%'";
-          parent = '';
-        } else if (key === '$null') {
-          sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NULL";
-          parent = '';
-        } else if (key === '$nnull') {
-          sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NOT NULL";
-          parent = '';
-        } else if (key === '$nn') {
-          sql += " " + op + " " + (parent.replace(/->$/, '')) + " IS NOT NULL";
-          parent = '';
-        } else if (Object.prototype.toString.call(obj[key]) === '[object Object]') {
-          parent += '`' + key + '`->';
-          sql += parse(obj[key], op, comp);
-        } else {
-          writeVal(key, comp);
         }
       }
       parent = '';
@@ -572,84 +574,98 @@
   };
 
   select = function(table, args, cb, isServer) {
-    return (function(user) {
-      return asyncCallback((isServer ? 'serverPreSelect' : 'preSelect'), {
-        table: table,
-        args: args,
-        user: user
-      }, function(result) {
-        var bit, i, key, myCb, mykey, output, sorting, where;
-        if (!result) {
-          return typeof cb === "function" ? cb([], 0) : void 0;
-        }
-        args = args || {};
-        where = makeWhere(args.where ? args.where : args);
-        sorting = '';
-        if (args.sort) {
-          if (Object.prototype.toString.call(args.sort) === '[object Object]') {
-            sorting += ' ORDER BY ';
-            i = 0;
-            for (key in args.sort) {
-              if (i++ > 0) {
-                sorting += ', ';
+    return new Promise(function(resolve, reject) {
+      return (function(user) {
+        return asyncCallback((isServer ? 'serverPreSelect' : 'preSelect'), {
+          table: table,
+          args: args,
+          user: user
+        }, function(result) {
+          var bit, i, key, myCb, mykey, output, sorting, where;
+          if (!result) {
+            resolve([]);
+            return typeof cb === "function" ? cb([], 0) : void 0;
+          }
+          args = args || {};
+          where = makeWhere(args.where ? args.where : args);
+          sorting = '';
+          if (args.sort) {
+            if (Object.prototype.toString.call(args.sort) === '[object Object]') {
+              sorting += ' ORDER BY ';
+              i = 0;
+              for (key in args.sort) {
+                if (i++ > 0) {
+                  sorting += ', ';
+                }
+                bit = args.sort[key];
+                mykey = key.replace(/\./g, '->');
+                if (bit === 1 || bit === 'ASC') {
+                  sorting += `\`${mykey}\` ASC`;
+                } else {
+                  sorting += `\`${mykey}\` DESC`;
+                }
               }
-              bit = args.sort[key];
-              mykey = key.replace(/\./g, '->');
-              if (bit === 1 || bit === 'ASC') {
-                sorting += "`" + mykey + "` ASC";
-              } else {
-                sorting += "`" + mykey + "` DESC";
+            } else {
+              args.sort = args.sort.replace(/\./g, '->');
+              sorting += ` ORDER BY \`${args.sort}\``;
+              if (args.sortDir) {
+                sorting += ` ${args.sortDir}`;
               }
-            }
-          } else {
-            args.sort = args.sort.replace(/\./g, '->');
-            sorting += " ORDER BY `" + args.sort + "`";
-            if (args.sortDir) {
-              sorting += " " + args.sortDir;
             }
           }
-        }
-        if (where.sql) {
-          where.sql = " WHERE " + where.sql;
-        }
-        myCb = function(output) {
-          return asyncCallback((isServer ? 'serverSelect' : 'select'), {
-            table: table,
-            objs: output,
-            isServer: isServer,
-            user: user
-          }, function() {
-            var total;
-            total = output.length;
-            if (args.page || args.pageSize) {
-              args.page = args.page || 1;
-              args.pageSize = args.pageSize || 10;
-              output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
-            }
-            return asyncCallback((isServer ? 'serverSelectTransform' : 'selectTransform'), {
+          if (where.sql) {
+            where.sql = ` WHERE ${where.sql}`;
+          }
+          myCb = function(output) {
+            return asyncCallback((isServer ? 'serverSelect' : 'select'), {
               table: table,
               objs: output,
               isServer: isServer,
               user: user
             }, function() {
-              ndx.user = user;
-              return typeof cb === "function" ? cb(output, total) : void 0;
+              var total;
+              total = output.length;
+              if (args.page || args.pageSize) {
+                args.page = args.page || 1;
+                args.pageSize = args.pageSize || 10;
+                output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
+              }
+              return asyncCallback((isServer ? 'serverSelectTransform' : 'selectTransform'), {
+                table: table,
+                objs: output,
+                isServer: isServer,
+                user: user
+              }, function() {
+                ndx.user = user;
+                resolve(output);
+                return typeof cb === "function" ? cb(output, total) : void 0;
+              });
             });
-          });
-        };
-        ndx.user = user;
-        return output = exec("SELECT * FROM " + table + where.sql + sorting, where.props, null, isServer, myCb);
-      });
-    })(ndx.user);
+          };
+          ndx.user = user;
+          return output = exec(`SELECT * FROM ${table}${where.sql}${sorting}`, where.props, null, isServer, myCb);
+        });
+      })(ndx.user);
+    });
+  };
+
+  selectOne = async function(table, args, cb, isServer) {
+    var output;
+    output = (await select(table, args, null, isServer));
+    if (output && output.length) {
+      return output[0];
+    } else {
+      return null;
+    }
   };
 
   count = function(table, whereObj, cb, isServer) {
     var res, where;
     where = makeWhere(whereObj);
     if (where.sql) {
-      where.sql = " WHERE " + where.sql;
+      where.sql = ` WHERE ${where.sql}`;
     }
-    res = exec("SELECT COUNT(*) AS c FROM " + table + where.sql, where.props, null, isServer, cb);
+    res = exec(`SELECT COUNT(*) AS c FROM ${table}${where.sql}`, where.props, null, isServer, cb);
     if (res && res.length) {
       return res[0].c;
     }
@@ -659,7 +675,7 @@
   cleanObj = function(obj) {
     var key;
     for (key in obj) {
-      if (key.indexOf('$') === 0 || key === '#') {
+      if (key.indexOf('$') === 0 || key === '#' || !obj.hasOwnProperty(key)) {
         delete obj[key];
       }
     }
@@ -670,10 +686,10 @@
     cleanObj(obj);
     where = makeWhere(whereObj);
     if (where.sql) {
-      where.sql = " WHERE " + where.sql;
+      where.sql = ` WHERE ${where.sql}`;
     }
     return (function(user) {
-      return exec("SELECT * FROM " + table + where.sql, where.props, null, true, function(oldItems) {
+      return exec(`SELECT * FROM ${table}${where.sql}`, where.props, null, true, function(oldItems) {
         if (oldItems) {
           return async.each(oldItems, function(oldItem, diffCb) {
             var diffs, id;
@@ -696,13 +712,13 @@
               updateProps = [];
               for (key in obj) {
                 if (where.props.indexOf(obj[key]) === -1) {
-                  updateSql.push(" `" + key + "`=? ");
+                  updateSql.push(` \`${key}\`=? `);
                   updateProps.push(obj[key]);
                 }
               }
               updateProps.push(id);
               ndx.user = user;
-              return exec("UPDATE " + table + " SET " + (updateSql.join(',')) + " WHERE `" + [settings.AUTO_ID] + "`= ?", updateProps, null, isServer, diffCb, diffs);
+              return exec(`UPDATE ${table} SET ${updateSql.join(',')} WHERE \`${[settings.AUTO_ID]}\`= ?`, updateProps, null, isServer, diffCb, diffs);
             });
           }, function() {
             return typeof cb === "function" ? cb([]) : void 0;
@@ -727,9 +743,9 @@
         }
         ndx.user = user;
         if (Object.prototype.toString.call(obj) === '[object Array]') {
-          return exec("INSERT INTO " + table + " SELECT * FROM ?", [obj], null, isServer, cb);
+          return exec(`INSERT INTO ${table} SELECT * FROM ?`, [obj], null, isServer, cb);
         } else {
-          return exec("INSERT INTO " + table + " VALUES ?", [obj], null, isServer, cb);
+          return exec(`INSERT INTO ${table} VALUES ?`, [obj], null, isServer, cb);
         }
       });
     })(ndx.user);
@@ -744,9 +760,9 @@
       where = makeWhere(whereObj);
     }
     if (where.sql) {
-      where.sql = " WHERE " + where.sql;
+      where.sql = ` WHERE ${where.sql}`;
     }
-    test = exec("SELECT * FROM " + table + where.sql, where.props, null, isServer);
+    test = exec(`SELECT * FROM ${table}${where.sql}`, where.props, null, isServer);
     if (test && test.length && where.sql) {
       return update(table, obj, whereObj, cb, isServer);
     } else {
@@ -758,7 +774,7 @@
     var where;
     where = makeWhere(whereObj);
     if (where.sql) {
-      where.sql = " WHERE " + where.sql;
+      where.sql = ` WHERE ${where.sql}`;
     }
     return (function(user) {
       return asyncCallback((isServer ? 'serverPreDelete' : 'preDelete'), {
@@ -772,7 +788,7 @@
           }
         }
         ndx.user = user;
-        return exec("DELETE FROM " + table + where.sql, where.props, null, isServer, cb);
+        return exec(`DELETE FROM ${table}${where.sql}`, where.props, null, isServer, cb);
       });
     })(ndx.user);
   };
@@ -848,11 +864,12 @@
     },
     exec: exec,
     select: select,
+    selectOne: selectOne,
     count: count,
     update: update,
     insert: insert,
     upsert: upsert,
-    "delete": del,
+    delete: del,
     maxModified: maxModified,
     maintenanceOn: function() {
       return maintenanceMode = true;
@@ -903,20 +920,18 @@
       outSlug = null;
       return async.whilst(function() {
         return outSlug === null;
-      }, (function(_this) {
-        return function(callback) {
-          return _this.select(table, {
-            slug: testSlug
-          }, function(results) {
-            if (results && results.length) {
-              testSlug = slug + '-' + Math.floor(Math.random() * 9999);
-            } else {
-              outSlug = testSlug;
-            }
-            return callback(null, outSlug);
-          }, true);
-        };
-      })(this), function(err, slug) {
+      }, (callback) => {
+        return this.select(table, {
+          slug: testSlug
+        }, function(results) {
+          if (results && results.length) {
+            testSlug = slug + '-' + Math.floor(Math.random() * 9999);
+          } else {
+            outSlug = testSlug;
+          }
+          return callback(null, outSlug);
+        }, true);
+      }, function(err, slug) {
         data.slug = slug;
         return typeof cb === "function" ? cb(true) : void 0;
       });

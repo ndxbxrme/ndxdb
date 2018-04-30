@@ -134,19 +134,100 @@ Configure the database
 
 Start the database
 
-#### `db.on(string callbackName, function callbackFn) -> db`
+## Callbacks
 
-Register a callback
-- *`ready`*  - the database is ready to use
-- *`restore`* - the database has been restored from a backup
-- *`preSelect`* - data is about to be fetched from the database
-- *`select`* - data has been fetched from the database
-- *`preInsert`* - data is about to be inserted into the database
-- *`insert`* - data has been inserted into the database
-- *`preUpdate`* - data is about to be updated in the database
-- *`update`* - data has been updated in the database
-- *`preDelete`* - data is about to be deleted  
-- *`delete`* - data has been deleted  
+```coffeescript
+ndx.database.on 'callbackName', (args, cb) ->
+  #do something with args
+  cb true #or false if you want to cancel the operation
+```
+
+### `ready`
+  The database is ready to use
+
+### `preInsert`
+* `args.table`
+  The database table being operated on
+* `args.obj`
+  The object being inserted into the database
+* `args.user`
+  The user carrying out the operation
+  
+`cb(false)` to cancel the insert
+  
+### `insert`
+* `args.id`
+  The inserted object's id
+* `args.table`
+  The database table being operated on
+* `args.obj`
+  The object that was inserted into the database
+* `args.user`
+  The user carrying out the operation
+  
+### `preUpdate`
+* `args.id`
+  The id of the object being updated
+* `args.table`
+  The database table being operated on
+* `args.where`
+  The database query
+* `args.obj`
+  The data to update
+* `args.oldObj`
+  The value of the object preUpdate
+* `args.changes`
+  The changes to be applied
+* `args.user`
+  The user carrying out the operation
+  
+`cb(false)` to cancel the update
+  
+### `update`
+* `args.id`
+  The id of the object that was updated
+* `args.table`
+  The database table that was operated on
+* `args.obj`
+  The data that was updated
+* `args.oldObj`
+  The value of the object pre update
+* `args.newObj`
+  The value of the object post update
+* `args.changes`
+  The changes that were applied
+* `args.user`
+  The user carrying out the operation
+  
+### `preSelect`
+* `args.table`
+  The database table being operated on
+* `args.args`
+  The arguments that were passed to the select function
+* `args.user`
+  The user carrying out the operation
+  
+### `select`
+* `args.table`
+  The database table being operated on
+* `args.objs`
+  The objects that were selected from the database
+* `args.user`
+  The user carrying out the operation
+  
+### `preDelete`
+* `args.table`
+  The database table being operated on
+* `args.where`
+  The database query
+* `args.user`
+  The user carrying out the operation
+  
+### `delete`
+* `args.table`
+  The database table being operated on
+* `args.user`
+  The user carrying out the operation
 
 callbacks can be used to modify data flowing to and from the database.  
 see [ndx-permissions](https://github.com/ndxbxrme/ndx-permissions) and [ndx-profiler](https://github.com/ndxbxrme/ndx-profiler) for examles  

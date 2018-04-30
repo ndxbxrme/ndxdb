@@ -65,7 +65,7 @@
         });
       },
       del: function(key, cb) {
-        var e, error;
+        var e;
         try {
           fs.unlinkSync(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
           return typeof cb === "function" ? cb(null, null) : void 0;
@@ -83,7 +83,7 @@
       },
       get: function(key, cb) {
         return fs.readFile(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'), 'utf8', function(e, r) {
-          var d, error;
+          var d;
           d = null;
           if (e && e.code && e.code === 'ENOENT') {
             return typeof cb === "function" ? cb('ENOENT', null) : void 0;

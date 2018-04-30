@@ -18,10 +18,12 @@
         {
           country: 'China',
           population: 1371220000
-        }, {
+        },
+        {
           country: 'India',
           population: 1311050000
-        }, {
+        },
+        {
           country: 'United States',
           population: 321418000
         }

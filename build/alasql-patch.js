@@ -19,7 +19,9 @@
       if (this.op === 'NOT') {
         s = this.op + '(' + this.right.toString() + ')';
       }
+      // Please avoid === here
       if (this.op === null) {
+        // jshint ignore:line
         s = '(' + this.right.toString() + ')';
       }
       if (!s) {

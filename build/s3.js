@@ -64,7 +64,7 @@
           Key: key
         };
         return S3.getObject(m, function(e, r) {
-          var d, error;
+          var d;
           if (e || !r.Body) {
             return typeof cb === "function" ? cb(e || 'error', null) : void 0;
           }

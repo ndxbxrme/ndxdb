@@ -13,6 +13,7 @@
       console.log('select', data);
       if (data.table === 't1') {
         console.log('switchin stuff');
+        //data.objs.splice 0, 1
         data.objs.push({
           boom: 'baam'
         });
