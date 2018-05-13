@@ -429,7 +429,7 @@ select = (table, args, cb, isServer) ->
               args.pageSize = args.pageSize or 10
               output = output.splice (args.page - 1) * args.pageSize, args.pageSize
             asyncCallback (if isServer then 'serverSelectTransform' else 'selectTransform'),
-              transform: args.transform
+              transformer: args.transformer
               table: table
               objs: output
               isServer: isServer

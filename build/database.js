@@ -634,7 +634,7 @@
                 output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
               }
               return asyncCallback((isServer ? 'serverSelectTransform' : 'selectTransform'), {
-                transform: args.transform,
+                transformer: args.transformer,
                 table: table,
                 objs: output,
                 isServer: isServer,
