@@ -34,6 +34,8 @@
         }
       },
       keys: function(from, prefix, cb) {
+        var ls;
+        ls = path.join(settings.LOCAL_STORAGE).replace(/\\/g, '/') + '/';
         return glob(path.join(settings.LOCAL_STORAGE, clean(prefix) + '*.json'), function(e, r) {
           var count, gotFrom, i, output;
           if (e) {
@@ -47,6 +49,8 @@
             IsTruncated: false
           };
           while (++i < r.length && count < 1000) {
+            r[i] = r[i].replace(ls, '');
+            console.log(ls);
             if (gotFrom) {
               output.Contents.push({
                 Key: unclean(r[i].replace('.json', ''))
@@ -66,6 +70,7 @@
       },
       del: function(key, cb) {
         var e;
+        console.log(clean(key));
         try {
           fs.unlinkSync(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
           return typeof cb === "function" ? cb(null, null) : void 0;

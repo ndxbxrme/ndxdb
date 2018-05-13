@@ -114,12 +114,14 @@
   };
 
   deleteKeys = function(cb) {
+    console.log('DELETE KEYS');
     return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
       var j, key, len, ref;
       if (!e && r && r.Contents) {
         ref = r.Contents;
         for (j = 0, len = ref.length; j < len; j++) {
           key = ref[j];
+          console.log('deleting', key.Key);
           storage.del(key.Key);
         }
       }
@@ -173,7 +175,8 @@
       }
       return async.eachSeries(r.Contents, function(key, callback) {
         return key.Key.replace(/(.+):(.+):(.+)\/(.+)(:.+)*/, function(all, db, type, table, id, randId) {
-          if (db && table && id && db === settings.DATABASE) {
+          console.log('key', db, type, table, id);
+          if (db && table && id && db.substr(db.lastIndexOf('/') + 1) === settings.DATABASE) {
             return getFn(key.Key, function(e, o) {
               var idField;
               if (e) {
@@ -631,6 +634,7 @@
                 output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
               }
               return asyncCallback((isServer ? 'serverSelectTransform' : 'selectTransform'), {
+                transform: args.transform,
                 table: table,
                 objs: output,
                 isServer: isServer,
@@ -794,8 +798,10 @@
   };
 
   consolidate = function() {
-    return deleteKeys(function() {
-      return saveDatabase();
+    return new Promise(function(resolve, reject) {
+      return deleteKeys(function() {
+        return saveDatabase(resolve);
+      });
     });
   };
 
@@ -822,6 +828,9 @@
       settings.ENCRYPTION_KEY = settings.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
       settings.ENCRYPTION_ALGORITHM = settings.ENCRYPTION_ALGORITHM || process.env.ENCRYPTION_ALGORITHM;
       settings.DO_NOT_ENCRYPT = settings.DO_NOT_ENCRYPT || process.env.DO_NOT_ENCRYPT;
+      if (!settings.AUTO_ID) {
+        settings.AUTO_ID = '_id';
+      }
       storage = require('./storage')();
       storage.checkDataDir();
       return this;

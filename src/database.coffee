@@ -65,9 +65,11 @@ asyncCallback = (name, obj, cb) ->
   else
     cb? true
 deleteKeys = (cb) ->
+  console.log 'DELETE KEYS'
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if not e and r and r.Contents
       for key in r.Contents
+        console.log 'deleting', key.Key
         storage.del key.Key
     if r.IsTruncated
       process.nextTick ->
@@ -101,7 +103,8 @@ inflate = (from, cb, getFn) ->
       return console.log 'error', e
     async.eachSeries r.Contents, (key, callback) ->
       key.Key.replace /(.+):(.+):(.+)\/(.+)(:.+)*/, (all, db, type, table, id, randId) ->
-        if db and table and id and db is settings.DATABASE
+        console.log 'key', db, type, table, id
+        if db and table and id and db.substr(db.lastIndexOf('/') + 1) is settings.DATABASE
           getFn key.Key, (e, o) ->
             if e
               return callback()
@@ -426,6 +429,7 @@ select = (table, args, cb, isServer) ->
               args.pageSize = args.pageSize or 10
               output = output.splice (args.page - 1) * args.pageSize, args.pageSize
             asyncCallback (if isServer then 'serverSelectTransform' else 'selectTransform'),
+              transform: args.transform
               table: table
               objs: output
               isServer: isServer
@@ -537,8 +541,9 @@ del = (table, whereObj, cb, isServer) ->
       exec "DELETE FROM #{table}#{where.sql}", where.props, null, isServer, cb
   )(ndx.user)  
 consolidate = ->
-  deleteKeys ->
-    saveDatabase()
+  new Promise (resolve, reject) ->
+    deleteKeys ->
+      saveDatabase resolve
 consolidateCheck = ->
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if r and r.Contents and r.Contents.length > (+settings.CONSOLIDATE_COUNT or 500)
@@ -558,6 +563,8 @@ module.exports =
     settings.ENCRYPTION_KEY = settings.ENCRYPTION_KEY or process.env.ENCRYPTION_KEY
     settings.ENCRYPTION_ALGORITHM = settings.ENCRYPTION_ALGORITHM or process.env.ENCRYPTION_ALGORITHM
     settings.DO_NOT_ENCRYPT = settings.DO_NOT_ENCRYPT or process.env.DO_NOT_ENCRYPT
+    if not settings.AUTO_ID
+      settings.AUTO_ID = '_id'
     storage = require('./storage')()
     storage.checkDataDir()
     @
