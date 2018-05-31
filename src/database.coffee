@@ -605,7 +605,7 @@ module.exports =
   upsert: upsert
   delete: del
   bindFns: (user) ->
-    #not currently used
+    console.log 'bindFns'
   maxModified: maxModified
   maintenanceOn: ->
     maintenanceMode = true

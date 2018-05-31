@@ -879,6 +879,9 @@
     insert: insert,
     upsert: upsert,
     delete: del,
+    bindFns: function(user) {
+      return console.log('bindFns');
+    },
     maxModified: maxModified,
     maintenanceOn: function() {
       return maintenanceMode = true;
