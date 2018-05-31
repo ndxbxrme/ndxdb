@@ -604,6 +604,8 @@ module.exports =
   insert: insert
   upsert: upsert
   delete: del
+  bindFns: (user) ->
+    #not currently used
   maxModified: maxModified
   maintenanceOn: ->
     maintenanceMode = true
