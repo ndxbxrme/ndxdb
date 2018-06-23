@@ -248,6 +248,7 @@ exec = (sql, props, notCritical, isServer, cb, changes) ->
           delObj[getIdField(r)] = getId r
           storage.put settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical
           asyncCallback (if isServer then 'serverDelete' else 'delete'), 
+            op: 'delete'
             id: getId r
             table: table
             obj: delObj
@@ -261,6 +262,7 @@ exec = (sql, props, notCritical, isServer, cb, changes) ->
             prop.u = new Date().valueOf()
           storage.put settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical
           asyncCallback (if isServer then 'serverInsert' else 'insert'), 
+            op: 'insert'
             id: getId prop
             table: table
             obj: prop
@@ -272,6 +274,7 @@ exec = (sql, props, notCritical, isServer, cb, changes) ->
           props[0].u = new Date().valueOf();
         storage.put settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical
         asyncCallback (if isServer then 'serverInsert' else 'insert'),
+          op: 'insert'
           id: getId props[0]
           table: table
           obj: props[0]
@@ -288,6 +291,7 @@ exec = (sql, props, notCritical, isServer, cb, changes) ->
         r = res[0]
         storage.put settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical
         asyncCallback (if isServer then 'serverUpdate' else 'update'),
+          op: 'update'
           id: getId r
           table: updateId.ndxtable
           obj: r
@@ -386,6 +390,7 @@ select = (table, args, cb, isServer) ->
   new Promise (resolve, reject) ->
     ((user) ->
       asyncCallback (if isServer then 'serverPreSelect' else 'preSelect'), 
+        op: 'select'
         table: table
         args: args
         user: user
@@ -418,6 +423,7 @@ select = (table, args, cb, isServer) ->
           where.sql = " WHERE #{where.sql}"
         myCb = (output) ->
           asyncCallback (if isServer then 'serverSelect' else 'select'), 
+            op: 'select'
             table: table
             objs: output
             isServer: isServer
@@ -429,6 +435,7 @@ select = (table, args, cb, isServer) ->
               args.pageSize = args.pageSize or 10
               output = output.splice (args.page - 1) * args.pageSize, args.pageSize
             asyncCallback (if isServer then 'serverSelectTransform' else 'selectTransform'),
+              op: 'select'
               transformer: args.transformer
               table: table
               objs: output
@@ -472,6 +479,7 @@ update = (table, obj, whereObj, cb, isServer) ->
           diffs = readDiffs oldItem, obj
           id = getId oldItem
           asyncCallback (if isServer then 'serverPreUpdate' else 'preUpdate'),
+            op: 'update'
             id: id
             table: table
             obj: obj
@@ -500,6 +508,7 @@ insert = (table, obj, cb, isServer) ->
   cleanObj obj
   ((user) ->
     asyncCallback (if isServer then 'serverPreInsert' else 'preInsert'),
+      op: 'insert'
       table: table
       obj: obj
       user: user
@@ -531,6 +540,7 @@ del = (table, whereObj, cb, isServer) ->
     where.sql = " WHERE #{where.sql}"
   ((user) ->
     asyncCallback (if isServer then 'serverPreDelete' else 'preDelete'),
+      op: 'delete'
       table: table
       where: whereObj
       user: user

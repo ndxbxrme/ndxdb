@@ -395,6 +395,7 @@
             delObj[getIdField(r)] = getId(r);
             storage.put(settings.DATABASE + ':node:' + table + '/' + getId(r), delObj, null, notCritical);
             asyncCallback((isServer ? 'serverDelete' : 'delete'), {
+              op: 'delete',
               id: getId(r),
               table: table,
               obj: delObj,
@@ -414,6 +415,7 @@
             }
             storage.put(settings.DATABASE + ':node:' + table + '/' + getId(prop), prop, null, notCritical);
             asyncCallback((isServer ? 'serverInsert' : 'insert'), {
+              op: 'insert',
               id: getId(prop),
               table: table,
               obj: prop,
@@ -428,6 +430,7 @@
           }
           storage.put(settings.DATABASE + ':node:' + table + '/' + getId(props[0]), props[0], null, notCritical);
           asyncCallback((isServer ? 'serverInsert' : 'insert'), {
+            op: 'insert',
             id: getId(props[0]),
             table: table,
             obj: props[0],
@@ -450,6 +453,7 @@
           r = res[0];
           storage.put(settings.DATABASE + ':node:' + updateId.ndxtable + '/' + getId(r), r, null, notCritical);
           asyncCallback((isServer ? 'serverUpdate' : 'update'), {
+            op: 'update',
             id: getId(r),
             table: updateId.ndxtable,
             obj: r,
@@ -580,6 +584,7 @@
     return new Promise(function(resolve, reject) {
       return (function(user) {
         return asyncCallback((isServer ? 'serverPreSelect' : 'preSelect'), {
+          op: 'select',
           table: table,
           args: args,
           user: user
@@ -621,6 +626,7 @@
           }
           myCb = function(output) {
             return asyncCallback((isServer ? 'serverSelect' : 'select'), {
+              op: 'select',
               table: table,
               objs: output,
               isServer: isServer,
@@ -634,6 +640,7 @@
                 output = output.splice((args.page - 1) * args.pageSize, args.pageSize);
               }
               return asyncCallback((isServer ? 'serverSelectTransform' : 'selectTransform'), {
+                op: 'select',
                 transformer: args.transformer,
                 table: table,
                 objs: output,
@@ -700,6 +707,7 @@
             diffs = readDiffs(oldItem, obj);
             id = getId(oldItem);
             return asyncCallback((isServer ? 'serverPreUpdate' : 'preUpdate'), {
+              op: 'update',
               id: id,
               table: table,
               obj: obj,
@@ -738,6 +746,7 @@
     cleanObj(obj);
     return (function(user) {
       return asyncCallback((isServer ? 'serverPreInsert' : 'preInsert'), {
+        op: 'insert',
         table: table,
         obj: obj,
         user: user
@@ -782,6 +791,7 @@
     }
     return (function(user) {
       return asyncCallback((isServer ? 'serverPreDelete' : 'preDelete'), {
+        op: 'delete',
         table: table,
         where: whereObj,
         user: user
