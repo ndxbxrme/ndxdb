@@ -283,19 +283,22 @@
   };
 
   restoreFromBackup = function(readStream) {
-    maintenanceMode = true;
-    return storage.get('', function(e, o) {
-      if (!e && o) {
-        return restoreDatabase(o, function() {
-          return deleteKeys(function() {
-            return saveDatabase(function() {
-              console.log("backup restored");
-              return syncCallback('restore', null);
+    return new Promise(function(resolve) {
+      maintenanceMode = true;
+      return storage.get('', function(e, o) {
+        if (!e && o) {
+          return restoreDatabase(o, function() {
+            return deleteKeys(function() {
+              return saveDatabase(function() {
+                console.log("backup restored");
+                syncCallback('restore', null);
+                return resolve();
+              });
             });
           });
-        });
-      }
-    }, readStream);
+        }
+      }, readStream);
+    });
   };
 
   exec = function(sql, props, notCritical, isServer, cb, changes) {

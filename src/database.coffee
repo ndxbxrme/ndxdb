@@ -172,15 +172,17 @@ upgradeDatabase = ->
     else
       console.log '\nerror decrypting database.  \nif you have changed the encryption key and want to save your data use ndx-framework to upgrade the database otherwise delete the data directory and restart the app'
 restoreFromBackup = (readStream) ->
-  maintenanceMode = true
-  storage.get '', (e, o) ->
-    if not e and o
-      restoreDatabase o, ->
-        deleteKeys ->
-          saveDatabase ->
-            console.log "backup restored"
-            syncCallback 'restore', null
-  , readStream
+  new Promise (resolve) ->
+    maintenanceMode = true
+    storage.get '', (e, o) ->
+      if not e and o
+        restoreDatabase o, ->
+          deleteKeys ->
+            saveDatabase ->
+              console.log "backup restored"
+              syncCallback 'restore', null
+              resolve()
+    , readStream
 exec = (sql, props, notCritical, isServer, cb, changes) ->
   if maintenanceMode
     cb? []
