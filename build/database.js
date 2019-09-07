@@ -302,7 +302,7 @@
   };
 
   exec = function(sql, props, notCritical, isServer, cb, changes) {
-    var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
+    var args, ast, error, hash, hh, idProps, idWhere, isDelete, isInsert, isSelect, isUpdate, j, k, l, len, len1, len2, myCb, output, prop, ref, ref1, ref2, res, statement, table, updateIds;
     if (maintenanceMode) {
       if (typeof cb === "function") {
         cb([]);
@@ -444,7 +444,14 @@
         }
       }
     }
-    output = database.exec(sql, props, cb);
+    myCb = function() {
+      if (isInsert || isUpdate) {
+        return typeof cb === "function" ? cb(prop || props[0]) : void 0;
+      } else {
+        return cb != null ? cb.apply(this, arguments) : void 0;
+      }
+    };
+    output = database.exec(sql, props, myCb);
     if (updateIds && updateIds.length) {
       async.each(updateIds, function(updateId, callback) {
         var r;

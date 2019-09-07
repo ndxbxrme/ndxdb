@@ -11,7 +11,7 @@
     });
   }).start();
 
-  test = function() {
+  test = async function() {
     var result, vals;
     if (!db.maintenance()) {
       vals = [
@@ -28,9 +28,9 @@
           population: 321418000
         }
       ];
-      db.upsert('table1', vals[0], {
+      console.log('this thing', (await db.upsert('table1', vals[0], {
         country: vals[0].country
-      });
+      })));
       result = db.exec('SELECT * FROM table1 WHERE population > ? ORDER BY population ASC', [500000000]);
       return console.log('result', result);
     }

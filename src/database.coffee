@@ -283,7 +283,12 @@ exec = (sql, props, notCritical, isServer, cb, changes) ->
           user: ndx.user
           args: args
           isServer: isServer
-  output = database.exec sql, props, cb   
+  myCb = ->
+    if isInsert or isUpdate
+      cb? prop or props[0]
+    else
+      cb?.apply @, arguments
+  output = database.exec sql, props, myCb   
   if updateIds and updateIds.length
     async.each updateIds, (updateId, callback) ->
       if settings.AUTO_DATE
