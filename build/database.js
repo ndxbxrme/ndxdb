@@ -746,25 +746,32 @@
   };
 
   insert = function(table, obj, cb, isServer) {
-    cleanObj(obj);
-    return (function(user) {
-      return asyncCallback((isServer ? 'serverPreInsert' : 'preInsert'), {
-        op: 'insert',
-        table: table,
-        obj: obj,
-        user: user
-      }, function(result) {
-        if (!result) {
-          return typeof cb === "function" ? cb([]) : void 0;
-        }
-        ndx.user = user;
-        if (Object.prototype.toString.call(obj) === '[object Array]') {
-          return exec(`INSERT INTO ${table} SELECT * FROM ?`, [obj], null, isServer, cb);
-        } else {
-          return exec(`INSERT INTO ${table} VALUES ?`, [obj], null, isServer, cb);
-        }
-      });
-    })(ndx.user);
+    return new Promise(function(resolve, reject) {
+      cleanObj(obj);
+      return (function(user) {
+        var myCb;
+        myCb = function() {
+          resolve.apply(this, arguments);
+          return cb != null ? cb.apply(this, arguments) : void 0;
+        };
+        return asyncCallback((isServer ? 'serverPreInsert' : 'preInsert'), {
+          op: 'insert',
+          table: table,
+          obj: obj,
+          user: user
+        }, function(result) {
+          if (!result) {
+            return typeof cb === "function" ? cb([]) : void 0;
+          }
+          ndx.user = user;
+          if (Object.prototype.toString.call(obj) === '[object Array]') {
+            return exec(`INSERT INTO ${table} SELECT * FROM ?`, [obj], null, isServer, cb);
+          } else {
+            return exec(`INSERT INTO ${table} VALUES ?`, [obj], null, isServer, cb);
+          }
+        });
+      })(ndx.user);
+    });
   };
 
   upsert = function(table, obj, whereObj, cb, isServer) {

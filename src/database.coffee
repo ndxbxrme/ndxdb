@@ -507,22 +507,26 @@ update = (table, obj, whereObj, cb, isServer) ->
         cb? []
   )(ndx.user)
 insert = (table, obj, cb, isServer) ->
-  cleanObj obj
-  ((user) ->
-    asyncCallback (if isServer then 'serverPreInsert' else 'preInsert'),
-      op: 'insert'
-      table: table
-      obj: obj
-      user: user
-    , (result) ->
-      if not result
-        return cb? []
-      ndx.user = user
-      if Object.prototype.toString.call(obj) is '[object Array]'
-        exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
-      else
-        exec "INSERT INTO #{table} VALUES ?", [obj], null, isServer, cb
-  )(ndx.user)
+  new Promise (resolve, reject) ->
+    cleanObj obj
+    ((user) ->
+      myCb = ->
+        resolve.apply @, arguments
+        cb?.apply @, arguments
+      asyncCallback (if isServer then 'serverPreInsert' else 'preInsert'),
+        op: 'insert'
+        table: table
+        obj: obj
+        user: user
+      , (result) ->
+        if not result
+          return cb? []
+        ndx.user = user
+        if Object.prototype.toString.call(obj) is '[object Array]'
+          exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
+        else
+          exec "INSERT INTO #{table} VALUES ?", [obj], null, isServer, cb
+    )(ndx.user)
 upsert = (table, obj, whereObj, cb, isServer) ->
   where = makeWhere whereObj
   if not whereObj and obj[settings.AUTO_ID]
