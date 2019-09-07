@@ -520,12 +520,12 @@ insert = (table, obj, cb, isServer) ->
         user: user
       , (result) ->
         if not result
-          return cb? []
+          return myCb? null
         ndx.user = user
         if Object.prototype.toString.call(obj) is '[object Array]'
-          exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, cb
+          exec "INSERT INTO #{table} SELECT * FROM ?", [obj], null, isServer, myCb
         else
-          exec "INSERT INTO #{table} VALUES ?", [obj], null, isServer, cb
+          exec "INSERT INTO #{table} VALUES ?", [obj], null, isServer, myCb
     )(ndx.user)
 upsert = (table, obj, whereObj, cb, isServer) ->
   where = makeWhere whereObj

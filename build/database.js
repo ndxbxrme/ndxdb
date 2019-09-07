@@ -761,13 +761,13 @@
           user: user
         }, function(result) {
           if (!result) {
-            return typeof cb === "function" ? cb([]) : void 0;
+            return typeof myCb === "function" ? myCb(null) : void 0;
           }
           ndx.user = user;
           if (Object.prototype.toString.call(obj) === '[object Array]') {
-            return exec(`INSERT INTO ${table} SELECT * FROM ?`, [obj], null, isServer, cb);
+            return exec(`INSERT INTO ${table} SELECT * FROM ?`, [obj], null, isServer, myCb);
           } else {
-            return exec(`INSERT INTO ${table} VALUES ?`, [obj], null, isServer, cb);
+            return exec(`INSERT INTO ${table} VALUES ?`, [obj], null, isServer, myCb);
           }
         });
       })(ndx.user);
