@@ -50,7 +50,6 @@
           };
           while (++i < r.length && count < 1000) {
             r[i] = r[i].replace(ls, '');
-            console.log(ls);
             if (gotFrom) {
               output.Contents.push({
                 Key: unclean(r[i].replace('.json', ''))
@@ -70,7 +69,6 @@
       },
       del: function(key, cb) {
         var e;
-        console.log(clean(key));
         try {
           fs.unlinkSync(path.join(settings.LOCAL_STORAGE, clean(key) + '.json'));
           return typeof cb === "function" ? cb(null, null) : void 0;

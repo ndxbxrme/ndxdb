@@ -32,7 +32,6 @@ module.exports = ->
         IsTruncated: false
       while ++i < r.length and count < 1000
         r[i] = r[i].replace ls, ''
-        console.log ls
         if gotFrom
           output.Contents.push
             Key: unclean r[i].replace('.json', '')
@@ -44,7 +43,6 @@ module.exports = ->
         output.IsTruncated = true
       cb? null, output
   del: (key, cb) ->
-    console.log clean(key)
     try
       fs.unlinkSync path.join(settings.LOCAL_STORAGE, clean(key) + '.json')
       cb? null, null

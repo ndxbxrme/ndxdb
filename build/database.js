@@ -114,14 +114,12 @@
   };
 
   deleteKeys = function(cb) {
-    console.log('DELETE KEYS');
     return storage.keys(null, settings.DATABASE + ':node:', function(e, r) {
       var j, key, len, ref;
       if (!e && r && r.Contents) {
         ref = r.Contents;
         for (j = 0, len = ref.length; j < len; j++) {
           key = ref[j];
-          console.log('deleting', key.Key);
           storage.del(key.Key);
         }
       }
@@ -175,7 +173,6 @@
       }
       return async.eachSeries(r.Contents, function(key, callback) {
         return key.Key.replace(/(.+):(.+):(.+)\/(.+)(:.+)*/, function(all, db, type, table, id, randId) {
-          console.log('key', db, type, table, id);
           if (db && table && id && db.substr(db.lastIndexOf('/') + 1) === settings.DATABASE) {
             return getFn(key.Key, function(e, o) {
               var idField;

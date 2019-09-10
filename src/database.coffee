@@ -65,11 +65,9 @@ asyncCallback = (name, obj, cb) ->
   else
     cb? true
 deleteKeys = (cb) ->
-  console.log 'DELETE KEYS'
   storage.keys null, settings.DATABASE + ':node:', (e, r) ->
     if not e and r and r.Contents
       for key in r.Contents
-        console.log 'deleting', key.Key
         storage.del key.Key
     if r.IsTruncated
       process.nextTick ->
@@ -103,7 +101,6 @@ inflate = (from, cb, getFn) ->
       return console.log 'error', e
     async.eachSeries r.Contents, (key, callback) ->
       key.Key.replace /(.+):(.+):(.+)\/(.+)(:.+)*/, (all, db, type, table, id, randId) ->
-        console.log 'key', db, type, table, id
         if db and table and id and db.substr(db.lastIndexOf('/') + 1) is settings.DATABASE
           getFn key.Key, (e, o) ->
             if e
